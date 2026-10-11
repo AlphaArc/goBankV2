@@ -1,12 +1,14 @@
 /**
  * Main Application Controller for goBankV2
+ * Vertical Timelines Schedule with Live DB Account Sync & Non-overlapping Layout
  */
 
 (function () {
   const STATE = {
     txCount: 2,
+    maxSteps: 8,
     mode: 'SIMULATE', // 'SIMULATE' or 'FIX'
-    accounts: {},
+    accounts: { A: 1000, B: 1000, C: 1000 },
     currentSchedule: [],
     lastResult: null,
   };
@@ -14,7 +16,11 @@
   // DOM Elements
   const txCountButtons = document.querySelectorAll('.tx-btn');
   const txCountSelect = document.getElementById('txCountSelect');
-  const timelinesList = document.getElementById('timelinesList');
+  const verticalScheduleMatrix = document.getElementById('verticalScheduleMatrix');
+  const verticalScheduleWrapper = document.getElementById('verticalScheduleWrapper');
+  const btnAddStepRow = document.getElementById('btnAddStepRow');
+  const stepRowsCountHint = document.getElementById('stepRowsCountHint');
+
   const sequenceStream = document.getElementById('sequenceStream');
   const sequenceCount = document.getElementById('sequenceCount');
   const btnMainAction = document.getElementById('btnMainAction');
@@ -25,6 +31,13 @@
   const btnLoadPreset = document.getElementById('btnLoadPreset');
   const presetSelect = document.getElementById('presetScenarioSelect');
   const btnResetDB = document.getElementById('btnResetDB');
+
+  const paletteAccount = document.getElementById('paletteAccount');
+  const paletteDelta = document.getElementById('paletteDelta');
+  const paletteReadAccountBadge = document.getElementById('paletteReadAccountBadge');
+  const paletteReadDesc = document.getElementById('paletteReadDesc');
+  const paletteWriteAmountBadge = document.getElementById('paletteWriteAmountBadge');
+  const paletteWriteDesc = document.getElementById('paletteWriteDesc');
 
   const hazardsContent = document.getElementById('hazardsContent');
   const serializableBadge = document.getElementById('serializableBadge');
@@ -44,14 +57,14 @@
   function init() {
     setupEventListeners();
     window.DragDropModule.init(handleScheduleModified);
-    renderTimelines();
+    renderVerticalSchedule();
     fetchAccountBalances();
-    // Load a default educational scenario to start
+    // Load default educational scenario
     loadPreset('lost_update');
   }
 
   function setupEventListeners() {
-    // Transaction Count Selector (Dropdown & Button Group)
+    // Transaction Count Selector
     function handleTxCountChange(count) {
       setTxCount(count);
       const defaultPresets = {
@@ -77,57 +90,69 @@
     });
 
     // Main Simulate / Fix Action Button
-    btnMainAction.addEventListener('click', handleMainActionClick);
+    if (btnMainAction) {
+      btnMainAction.addEventListener('click', handleMainActionClick);
+    }
 
     // Clear Timeline
-    btnClearTimeline.addEventListener('click', () => {
-      clearAllSlots();
-      resetToSimulateState();
-      showToast('Timelines cleared.');
-    });
+    if (btnClearTimeline) {
+      btnClearTimeline.addEventListener('click', () => {
+        clearAllSlots();
+        resetToSimulateState();
+        showToast('Timelines cleared.');
+      });
+    }
 
     // Preset Scenarios
-    btnLoadPreset.addEventListener('click', () => {
-      const selected = presetSelect.value;
-      if (selected) {
-        loadPreset(selected);
-      } else {
-        showToast('Please select a scenario from the dropdown.');
-      }
-    });
+    if (btnLoadPreset) {
+      btnLoadPreset.addEventListener('click', () => {
+        const selected = presetSelect.value;
+        if (selected) {
+          loadPreset(selected);
+        } else {
+          showToast('Please select a scenario from the dropdown.');
+        }
+      });
+    }
 
     // Reset Database
-    btnResetDB.addEventListener('click', async () => {
-      try {
-        const resp = await fetch('/api/reset', { method: 'POST' });
-        const data = await resp.json();
-        if (data.status === 'success') {
-          updateBalancesUI(data.accounts);
-          showToast('Database reset: Accounts set to $1,000.00.');
+    if (btnResetDB) {
+      btnResetDB.addEventListener('click', async () => {
+        try {
+          const resp = await fetch('/api/reset', { method: 'POST' });
+          const data = await resp.json();
+          if (data.status === 'success') {
+            updateBalancesUI(data.accounts);
+            showToast('Database reset: Accounts set to $1,000.00.');
+          }
+        } catch (err) {
+          showToast('Error resetting database: ' + err.message);
         }
-      } catch (err) {
-        showToast('Error resetting database: ' + err.message);
-      }
-    });
+      });
+    }
+
+    // Add Step Row Button
+    if (btnAddStepRow) {
+      btnAddStepRow.addEventListener('click', addStepRow);
+    }
+
+    // Palette Account & Delta changes (updates dynamic description)
+    if (paletteAccount) {
+      paletteAccount.addEventListener('change', updatePalettePreview);
+    }
+    if (paletteDelta) {
+      paletteDelta.addEventListener('change', updatePalettePreview);
+    }
   }
 
   // ==========================================================================
-  // Timelines Rendering
+  // Vertical Schedule Matrix Rendering (Rewritten from Scratch)
   // ==========================================================================
 
-  function createSlotElement(txId, step) {
-    const slot = document.createElement('div');
-    slot.className = 'timeline-slot relative flex-shrink-0 w-28 min-h-[76px] rounded-xl border-2 border-dashed border-slate-700/80 bg-slate-900/80 flex items-center justify-center transition-all duration-200 snap-start hover:border-sky-500/50';
-    slot.dataset.tx = txId;
-    slot.dataset.step = step;
-    slot.innerHTML = `<span class="absolute top-1 right-2 font-mono text-[10px] text-slate-500 select-none">${step}</span>`;
-    window.DragDropModule.bindSlotEvents(slot);
-    return slot;
-  }
-
-  function renderTimelines() {
-    timelinesList.innerHTML = '';
-    const txNames = ['T1', 'T2', 'T3', 'T4'];
+  function renderVerticalSchedule() {
+    if (!verticalScheduleMatrix) return;
+    verticalScheduleMatrix.innerHTML = '';
+    const txNames = ['T1', 'T2', 'T3', 'T4'].slice(0, STATE.txCount);
 
     const txBadges = {
       T1: 'border-sky-500/40 bg-sky-500/10 text-sky-400',
@@ -136,83 +161,74 @@
       T4: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
     };
 
-    for (let i = 0; i < STATE.txCount; i++) {
-      const txId = txNames[i];
-      const card = document.createElement('div');
-      card.className = 'tx-row bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 shadow-lg hover:border-slate-700/80 transition-all';
-      card.dataset.tx = txId;
+    // 1. Column Header Row (Sticky)
+    const headerRow = document.createElement('div');
+    headerRow.className = `grid schedule-grid-${STATE.txCount} gap-2.5 items-center pb-2 border-b border-slate-800 sticky top-0 bg-slate-900/95 z-20 backdrop-blur-md`;
+    headerRow.style.gridTemplateColumns = `56px repeat(${STATE.txCount}, minmax(0, 1fr))`;
 
-      card.innerHTML = `
-        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold border ${txBadges[txId]}">${txId}</span>
-            <span class="text-xs font-mono text-slate-500 tx-state-tag">Idle</span>
-          </div>
-          <button type="button" class="btn-add-step inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-sky-500/40 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 text-xs font-mono font-semibold transition" data-tx="${txId}" title="Add step to ${txId}">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span>+ Step</span>
-          </button>
-        </div>
-        <div class="overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 custom-scrollbar" id="scroll_${txId}">
-          <div class="flex items-stretch gap-2.5 min-w-max" id="track_${txId}"></div>
-        </div>
+    headerRow.innerHTML = `
+      <div class="text-center font-mono text-[11px] font-extrabold text-slate-500 tracking-wider">STEP</div>
+    `;
+
+    txNames.forEach(txId => {
+      const colHeader = document.createElement('div');
+      colHeader.className = 'flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 shadow-sm';
+      colHeader.innerHTML = `
+        <span class="px-2.5 py-0.5 rounded-lg text-xs font-mono font-bold border ${txBadges[txId]}">${txId}</span>
+        <span class="text-[11px] font-mono text-slate-500 tx-state-tag">Idle</span>
       `;
+      headerRow.appendChild(colHeader);
+    });
+    verticalScheduleMatrix.appendChild(headerRow);
 
-      const track = card.querySelector(`#track_${txId}`);
-      for (let step = 1; step <= 8; step++) {
-        const slot = createSlotElement(txId, step);
-        track.appendChild(slot);
-      }
-
-      const addStepBtn = card.querySelector('.btn-add-step');
-      addStepBtn.addEventListener('click', () => {
-        addStepToTimeline(txId);
-      });
-
-      timelinesList.appendChild(card);
+    // 2. Vertical Step Rows
+    for (let s = 1; s <= STATE.maxSteps; s++) {
+      const row = createStepRowElement(s, txNames);
+      verticalScheduleMatrix.appendChild(row);
     }
 
-    updateGlobalStepBar();
-  }
-
-  function addStepToTimeline(txId) {
-    const track = document.getElementById(`track_${txId}`);
-    const scrollWrapper = document.getElementById(`scroll_${txId}`);
-    if (!track) return;
-
-    const currentSlots = track.querySelectorAll('.timeline-slot');
-    const nextStep = currentSlots.length + 1;
-
-    const slot = createSlotElement(txId, nextStep);
-    track.appendChild(slot);
-
-    updateGlobalStepBar();
-
-    if (scrollWrapper) {
-      scrollWrapper.scrollTo({ left: scrollWrapper.scrollWidth, behavior: 'smooth' });
+    if (stepRowsCountHint) {
+      stepRowsCountHint.textContent = `${STATE.maxSteps} Step Rows active`;
     }
   }
 
-  function updateGlobalStepBar() {
-    const globalStepBar = document.getElementById('globalStepBar');
-    if (!globalStepBar) return;
+  function createStepRowElement(stepNum, txNames) {
+    const row = document.createElement('div');
+    row.className = `grid schedule-grid-${txNames.length} gap-2.5 items-center`;
+    row.style.gridTemplateColumns = `56px repeat(${txNames.length}, minmax(0, 1fr))`;
+    row.dataset.stepRow = stepNum;
 
-    let maxStep = 8;
-    document.querySelectorAll('.tx-slots-track, [id^="track_"]').forEach(track => {
-      const count = track.querySelectorAll('.timeline-slot').length;
-      if (count > maxStep) maxStep = count;
+    // Step Indicator Label
+    const stepLabel = document.createElement('div');
+    stepLabel.className = 'w-14 h-16 flex items-center justify-center font-mono text-xs font-bold text-slate-400 bg-slate-950/80 rounded-xl border border-slate-800/80 select-none shadow-sm';
+    stepLabel.innerHTML = `<span>S${stepNum}</span>`;
+    row.appendChild(stepLabel);
+
+    // Drop Slot for each Transaction
+    txNames.forEach(txId => {
+      const slot = document.createElement('div');
+      slot.className = 'timeline-slot relative flex-1 min-h-[64px] h-16 rounded-xl border-2 border-dashed border-slate-800 bg-slate-950/60 hover:border-sky-500/50 hover:bg-slate-900/60 flex items-center justify-center transition-all duration-200';
+      slot.dataset.tx = txId;
+      slot.dataset.step = stepNum;
+      window.DragDropModule.bindSlotEvents(slot);
+      row.appendChild(slot);
     });
 
-    globalStepBar.innerHTML = '';
-    for (let step = 1; step <= maxStep; step++) {
-      const marker = document.createElement('div');
-      marker.className = 'step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800';
-      marker.dataset.step = step;
-      marker.textContent = `Step ${step}`;
-      globalStepBar.appendChild(marker);
+    return row;
+  }
+
+  function addStepRow() {
+    STATE.maxSteps++;
+    const txNames = ['T1', 'T2', 'T3', 'T4'].slice(0, STATE.txCount);
+    const newRow = createStepRowElement(STATE.maxSteps, txNames);
+    verticalScheduleMatrix.appendChild(newRow);
+
+    if (stepRowsCountHint) {
+      stepRowsCountHint.textContent = `${STATE.maxSteps} Step Rows active`;
+    }
+
+    if (verticalScheduleWrapper) {
+      verticalScheduleWrapper.scrollTo({ top: verticalScheduleWrapper.scrollHeight, behavior: 'smooth' });
     }
   }
 
@@ -234,7 +250,7 @@
     }
 
     if (schedule.length === 0) {
-      sequenceStream.innerHTML = '<span class="sequence-empty">No operations placed — drag blocks into timelines above</span>';
+      sequenceStream.innerHTML = '<span class="text-xs text-slate-500 font-mono">No operations placed — drag blocks into vertical schedule above</span>';
       return;
     }
 
@@ -274,30 +290,42 @@
 
   function resetToSimulateState() {
     STATE.mode = 'SIMULATE';
-    btnMainAction.className = 'btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-sky-500 hover:bg-sky-400 shadow-lg shadow-sky-500/25 transition-all';
-    actionButtonText.textContent = 'Simulate Schedule';
-    actionIcon.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-      </svg>
-    `;
-    statusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
-    serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
-    serializableBadge.textContent = 'Ready';
+    if (btnMainAction) {
+      btnMainAction.className = 'btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-sky-500 hover:bg-sky-400 shadow-lg shadow-sky-500/25 transition-all';
+    }
+    if (actionButtonText) actionButtonText.textContent = 'Simulate Schedule';
+    if (actionIcon) {
+      actionIcon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      `;
+    }
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+    if (serializableBadge) {
+      serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
+      serializableBadge.textContent = 'Ready';
+    }
   }
 
   function transformToFixState() {
     STATE.mode = 'FIX';
-    btnMainAction.className = 'btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-500/30 transition-all animate-pulse';
-    actionButtonText.textContent = 'Fix Problem (Apply Strict 2PL)';
-    actionIcon.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-      </svg>
-    `;
-    statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
-    serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40';
-    serializableBadge.textContent = 'Non-Serializable Hazard';
+    if (btnMainAction) {
+      btnMainAction.className = 'btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-500/30 transition-all animate-pulse';
+    }
+    if (actionButtonText) actionButtonText.textContent = 'Fix Problem (Apply Strict 2PL)';
+    if (actionIcon) {
+      actionIcon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+      `;
+    }
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
+    if (serializableBadge) {
+      serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40';
+      serializableBadge.textContent = 'Non-Serializable Hazard';
+    }
   }
 
   // ==========================================================================
@@ -316,7 +344,7 @@
     if (STATE.mode === 'SIMULATE') {
       await runSimulation(schedule);
     } else {
-      await runFix(schedule);
+      await runSafeExecution(schedule);
     }
 
     setButtonLoading(false);
@@ -348,11 +376,6 @@
         isolation: 'READ COMMITTED',
       };
 
-      console.log('------------------------------------------------------------');
-      console.log('[goBankV2 Frontend] Dispathing Schedule to POST /simulate:');
-      console.log(JSON.stringify(payload, null, 2));
-      console.log('------------------------------------------------------------');
-
       const resp = await fetch('/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -360,266 +383,193 @@
       });
 
       if (!resp.ok) {
-        throw new Error(`Simulation failed: ${resp.statusText}`);
+        const err = await resp.json();
+        throw new Error(err.error || 'Simulation failed');
       }
 
       const result = await resp.json();
       STATE.lastResult = result;
 
-      // Update UI components
-      renderHazards(result.analysis);
-      renderPrecedenceGraph(result.analysis);
+      renderAnalysisResults(result.analysis);
+      renderPrecedenceGraph(result.analysis.precedenceEdges, result.analysis.cycleNodes);
       renderExecutionLogs(result.executionLogs);
       updateBalancesUI(result.finalAccounts);
 
-      if (result.analysis.hasHazards) {
+      if (result.analysis.hasHazards || result.analysis.cycleDetected) {
         transformToFixState();
-        showToast(`Hazards detected! Click "Fix Problem" to apply Strict 2PL.`);
+        showToast('Serialization hazards detected! Click "Fix Problem" to apply Strict 2PL.');
       } else {
-        statusDot.className = 'status-indicator-dot dot-safe';
-        serializableBadge.className = 'badge-status badge-safe';
-        serializableBadge.textContent = 'Conflict Serializable';
-        showToast('Schedule is safe and Conflict Serializable!');
+        resetToSimulateState();
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+        if (serializableBadge) {
+          serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+          serializableBadge.textContent = 'Conflict Serializable (Safe)';
+        }
+        showToast('Schedule is conflict serializable and anomaly-free.');
       }
     } catch (err) {
-      showToast('Error during simulation: ' + err.message);
+      showToast('Error running simulation: ' + err.message);
     }
   }
 
-  async function runFix(schedule) {
+  async function runSafeExecution(schedule) {
     try {
-      console.log('------------------------------------------------------------');
-      console.log('[goBankV2 Frontend] Calling POST /execute-safe with Strict 2PL:');
-      console.log(JSON.stringify({ txCount: STATE.txCount, schedule: schedule }, null, 2));
-      console.log('------------------------------------------------------------');
+      const payload = {
+        txCount: STATE.txCount,
+        schedule: schedule,
+        controlMode: 'STRICT_2PL',
+        isolation: 'SERIALIZABLE',
+      };
 
       const resp = await fetch('/execute-safe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          txCount: STATE.txCount,
-          schedule: schedule,
-          controlMode: 'STRICT_2PL',
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!resp.ok) {
-        throw new Error(`Execute Safe failed: ${resp.statusText}`);
+        const err = await resp.json();
+        throw new Error(err.error || 'Safe execution failed');
       }
 
-      const data = await resp.json();
-      const sim = data.simulation;
-      const fixedSchedule = data.fixedSchedule;
+      const res = await resp.json();
+      const result = res.simulation || res;
+      STATE.lastResult = result;
 
-      // Re-populate the timeline slots with the fixed schedule
-      populateTimelineFromSchedule(fixedSchedule);
+      if (result.analysis) {
+        renderAnalysisResults(result.analysis);
+        renderPrecedenceGraph(result.analysis.precedenceEdges, result.analysis.cycleNodes);
+      }
+      if (result.executionLogs) {
+        renderExecutionLogs(result.executionLogs);
+      }
+      if (result.finalAccounts) {
+        updateBalancesUI(result.finalAccounts);
+      }
 
-      // Render updated safe results
-      renderSafeResolution(data.fixMessage, sim);
-      renderPrecedenceGraph(sim.analysis);
-      renderExecutionLogs(sim.executionLogs);
-      updateBalancesUI(sim.finalAccounts);
-
-      // Reset button state
       resetToSimulateState();
-      statusDot.className = 'status-indicator-dot dot-fixed';
-      serializableBadge.className = 'badge-status badge-safe';
-      serializableBadge.textContent = 'Strict 2PL Enforced';
-
-      showToast('Problem Fixed: Strict 2PL concurrency control applied!');
+      if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+      if (serializableBadge) {
+        serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+        serializableBadge.textContent = 'Strict 2PL Enforced (Safe)';
+      }
+      showToast('Strict 2PL Concurrency Control applied. All hazards resolved!');
     } catch (err) {
-      showToast('Error applying fix: ' + err.message);
+      showToast('Error applying Strict 2PL: ' + err.message);
     }
   }
 
-  function setButtonLoading(loading) {
-    if (loading) {
-      actionSpinner.classList.remove('hidden');
-      actionIcon.classList.add('hidden');
-      btnMainAction.disabled = true;
-    } else {
-      actionSpinner.classList.add('hidden');
-      actionIcon.classList.remove('hidden');
-      btnMainAction.disabled = false;
-    }
+  function setButtonLoading(isLoading) {
+    if (!btnMainAction) return;
+    btnMainAction.disabled = isLoading;
+    if (actionSpinner) actionSpinner.classList.toggle('hidden', !isLoading);
+    if (actionIcon) actionIcon.classList.toggle('hidden', isLoading);
   }
 
   // ==========================================================================
-  // Results & Graph Visualizers
+  // Results Rendering
   // ==========================================================================
 
-  function renderHazards(analysis) {
+  function renderAnalysisResults(analysis) {
+    if (!hazardsContent) return;
     hazardsContent.innerHTML = '';
 
-    if (!analysis.hasHazards) {
+    if (!analysis.hasHazards && !analysis.cycleDetected) {
       hazardsContent.innerHTML = `
-        <div class="safe-banner">
-          <h4>✓ No Concurrency Hazards Detected</h4>
-          <p>The scheduled operations maintain serializability. No uncommitted dependencies, lost updates, or non-repeatable reads were observed.</p>
+        <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 flex flex-col gap-1">
+          <strong class="font-bold flex items-center gap-1.5 text-xs text-emerald-400">
+            <span>✓</span> No Serialization Hazards Detected
+          </strong>
+          <p class="text-[11px] text-slate-300">The schedule is equivalent to a serial execution. Precedence graph is acyclic.</p>
         </div>
       `;
-      serializableBadge.className = 'badge-status badge-safe';
-      serializableBadge.textContent = 'Serializable';
       return;
     }
 
-    serializableBadge.className = 'badge-status badge-hazard';
-    serializableBadge.textContent = `${analysis.hazards.length} Anomaly Hazard(s)`;
-
-    const list = document.createElement('div');
-    list.className = 'hazard-list';
-
+    // Hazards list
     analysis.hazards.forEach(h => {
       const item = document.createElement('div');
-      item.className = 'hazard-item';
+      item.className = 'p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 flex flex-col gap-1';
       item.innerHTML = `
-        <div class="hazard-title-row">
-          <span class="hazard-title">${escapeHtml(h.title)}</span>
-          <span class="hazard-tag">${escapeHtml(h.type)}</span>
+        <div class="flex items-center justify-between">
+          <strong class="text-xs font-bold text-rose-400">${escapeHtml(h.title)}</strong>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">${escapeHtml(h.type)}</span>
         </div>
-        <p class="hazard-desc">${escapeHtml(h.description)}</p>
-        <div class="hazard-hint"><strong>Solution:</strong> ${escapeHtml(h.fixHint)}</div>
+        <p class="text-[11px] text-slate-300">${escapeHtml(h.description)}</p>
+        <div class="text-[10px] text-slate-400 mt-1 font-mono">
+          <strong class="text-amber-400">Fix Protocol:</strong> ${escapeHtml(h.fixHint)}
+        </div>
       `;
-      list.appendChild(item);
+      hazardsContent.appendChild(item);
     });
 
-    hazardsContent.appendChild(list);
-  }
-
-  function renderSafeResolution(message, simResult) {
-    hazardsContent.innerHTML = `
-      <div class="safe-banner">
-        <h4>🔒 Concurrency Control Applied (Strict 2PL)</h4>
-        <p>${escapeHtml(message)}</p>
-        <p style="margin-top: 6px; font-size: 0.78rem; color: #a7f3d0;">
-          All row operations acquired exclusive locks and held them through COMMIT, completely preventing race conditions.
-        </p>
-      </div>
-    `;
-  }
-
-  function renderExecutionLogs(logs) {
-    traceLogContainer.innerHTML = '';
-    if (!logs || logs.length === 0) {
-      traceLogContainer.innerHTML = '<div class="empty-state"><p>No operations executed.</p></div>';
-      return;
+    if (analysis.cycleDetected) {
+      const cycleItem = document.createElement('div');
+      cycleItem.className = 'p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 flex flex-col gap-1';
+      cycleItem.innerHTML = `
+        <strong class="text-xs font-bold text-amber-400">Serialization Dependency Cycle (Deadlock)</strong>
+        <p class="text-[11px] text-slate-300">Cycle path detected: <span class="font-mono text-amber-300 font-bold">${analysis.cycleNodes.join(' → ')}</span>.</p>
+      `;
+      hazardsContent.appendChild(cycleItem);
     }
-
-    logs.forEach(log => {
-      const entry = document.createElement('div');
-      entry.className = `trace-entry status-${log.status}`;
-
-      let valText = '';
-      if (log.observedValue !== undefined && log.observedValue !== null) {
-        valText = ` | Read: $${log.observedValue.toFixed(2)}`;
-      }
-      if (log.writtenValue !== undefined && log.writtenValue !== null) {
-        valText = ` | Balance: $${log.writtenValue.toFixed(2)}`;
-      }
-
-      let statusTag = '';
-      if (log.status === 'DEADLOCK_ROLLED_BACK') {
-        statusTag = '<span class="status-badge badge-deadlock">⚠️ DEADLOCK ROLLED BACK</span>';
-      } else if (log.status === 'BLOCKED_WAIT') {
-        statusTag = '<span class="status-badge badge-blocked">⏳ LOCK WAIT</span>';
-      } else if (log.status === 'SUCCESS') {
-        statusTag = '<span class="status-badge badge-success">✓ SUCCESS</span>';
-      }
-
-      entry.innerHTML = `
-        <div class="trace-top">
-          <span class="trace-step-tag">Step ${log.stepIndex}: [${log.txId}] ${log.op} (${log.account})</span>
-          <div class="trace-right-meta">
-            ${statusTag}
-            <span class="trace-duration">${log.durationMs}ms</span>
-          </div>
-        </div>
-        <div class="trace-detail">${escapeHtml(log.detail)}${valText}</div>
-      `;
-      traceLogContainer.appendChild(entry);
-    });
   }
 
-  function renderPrecedenceGraph(analysis) {
+  function renderPrecedenceGraph(edges, cycleNodes) {
+    if (!precedenceSvg) return;
     precedenceSvg.innerHTML = '';
-    const edges = analysis.precedenceEdges || [];
 
-    // Responsive node coordinates tailored to transaction count
-    let nodes = {};
-    if (STATE.txCount === 1) {
-      nodes = {
-        T1: { x: 225, y: 110, color: '#38bdf8' },
-      };
-    } else if (STATE.txCount === 2) {
-      nodes = {
-        T1: { x: 110, y: 110, color: '#38bdf8' },
-        T2: { x: 340, y: 110, color: '#a855f7' },
-      };
-    } else if (STATE.txCount === 3) {
-      nodes = {
-        T1: { x: 225, y: 55,  color: '#38bdf8' },
-        T2: { x: 360, y: 165, color: '#a855f7' },
-        T3: { x: 90,  y: 165, color: '#f59e0b' },
-      };
-    } else {
-      nodes = {
-        T1: { x: 90,  y: 60,  color: '#38bdf8' },
-        T2: { x: 360, y: 60,  color: '#a855f7' },
-        T3: { x: 360, y: 165, color: '#f59e0b' },
-        T4: { x: 90,  y: 165, color: '#10b981' },
-      };
-    }
+    const txPositions = {
+      T1: { x: 90, y: 60 },
+      T2: { x: 360, y: 60 },
+      T3: { x: 360, y: 170 },
+      T4: { x: 90, y: 170 },
+    };
 
-    // Defs for arrow markers
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    defs.innerHTML = `
-      <marker id="arrow-hazard" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="#f43f5e" />
-      </marker>
-      <marker id="arrow-safe" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
-      </marker>
-    `;
-    precedenceSvg.appendChild(defs);
+    // Draw active nodes
+    const activeTxs = ['T1', 'T2', 'T3', 'T4'].slice(0, STATE.txCount);
+    activeTxs.forEach(tx => {
+      const pos = txPositions[tx];
+      const isCycle = cycleNodes && cycleNodes.includes(tx);
 
-    // Draw active transaction nodes
-    for (let i = 1; i <= STATE.txCount; i++) {
-      const tx = `T${i}`;
-      const n = nodes[tx];
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', pos.x);
+      circle.setAttribute('cy', pos.y);
+      circle.setAttribute('r', '22');
+      circle.setAttribute('fill', isCycle ? 'rgba(244, 63, 94, 0.25)' : 'rgba(30, 41, 59, 0.8)');
+      circle.setAttribute('stroke', isCycle ? '#f43f5e' : '#38bdf8');
+      circle.setAttribute('stroke-width', '2');
+      precedenceSvg.appendChild(circle);
 
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.innerHTML = `
-        <circle cx="${n.x}" cy="${n.y}" r="22" fill="rgba(255,255,255,0.05)" stroke="${n.color}" stroke-width="2.5" />
-        <text x="${n.x}" y="${n.y + 5}" font-family="JetBrains Mono" font-size="14" font-weight="bold" fill="#f1f5f9" text-anchor="middle">${tx}</text>
-      `;
-      precedenceSvg.appendChild(g);
-    }
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', pos.x);
+      text.setAttribute('y', pos.y + 5);
+      text.setAttribute('font-family', 'JetBrains Mono');
+      text.setAttribute('font-size', '13');
+      text.setAttribute('font-weight', 'bold');
+      text.setAttribute('fill', '#f8fafc');
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = tx;
+      precedenceSvg.appendChild(text);
+    });
 
-    // Draw conflict edges
-    const isCycle = analysis.cycleDetected;
-    edges.forEach((edge, idx) => {
-      const src = nodes[edge.fromTx];
-      const dst = nodes[edge.toTx];
-      if (!src || !dst) return;
+    // Draw directed edges
+    edges.forEach(edge => {
+      const from = txPositions[edge.fromTx];
+      const to = txPositions[edge.toTx];
+      if (!from || !to) return;
 
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const markerId = isCycle ? 'url(#arrow-hazard)' : 'url(#arrow-safe)';
-      const strokeColor = isCycle ? '#f43f5e' : '#38bdf8';
-
-      // Slight curve for visibility
-      const midX = (src.x + dst.x) / 2;
-      const midY = (src.y + dst.y) / 2 - (idx % 2 === 0 ? 25 : -25);
-
-      path.setAttribute('d', `M ${src.x} ${src.y} Q ${midX} ${midY} ${dst.x} ${dst.y}`);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', strokeColor);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      path.setAttribute('x1', from.x);
+      path.setAttribute('y1', from.y);
+      path.setAttribute('x2', to.x);
+      path.setAttribute('y2', to.y);
+      path.setAttribute('stroke', '#a855f7');
       path.setAttribute('stroke-width', '2');
-      path.setAttribute('stroke-dasharray', isCycle ? '4 2' : 'none');
-      path.setAttribute('marker-end', markerId);
-
+      path.setAttribute('stroke-dasharray', '4 2');
       precedenceSvg.appendChild(path);
 
-      // Label on edge
+      const midX = (from.x + to.x) / 2;
+      const midY = (from.y + to.y) / 2 - 8;
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       label.setAttribute('x', midX);
       label.setAttribute('y', midY);
@@ -644,8 +594,43 @@
     }
   }
 
+  function renderExecutionLogs(logs) {
+    if (!traceLogContainer) return;
+    traceLogContainer.innerHTML = '';
+
+    if (!logs || logs.length === 0) {
+      traceLogContainer.innerHTML = '<div class="text-slate-500 italic">No operations recorded.</div>';
+      return;
+    }
+
+    logs.forEach(l => {
+      const row = document.createElement('div');
+      row.className = 'p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono flex items-center justify-between gap-2';
+
+      let statusColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+      if (l.status.includes('DEADLOCK') || l.status.includes('ROLLBACK')) {
+        statusColor = 'text-rose-400 bg-rose-500/10 border-rose-500/30';
+      } else if (l.status.includes('WAIT')) {
+        statusColor = 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+      }
+
+      row.innerHTML = `
+        <div class="flex items-center gap-1.5 min-w-0">
+          <span class="text-sky-400 font-bold">S${l.stepIndex}</span>
+          <span class="text-slate-400">${l.txId}.${l.op}</span>
+          <span class="text-slate-300 truncate">${escapeHtml(l.detail)}</span>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <span class="px-1.5 py-0.5 rounded text-[10px] border ${statusColor}">${l.status}</span>
+          <span class="text-[10px] text-slate-500">${l.durationMs}ms</span>
+        </div>
+      `;
+      traceLogContainer.appendChild(row);
+    });
+  }
+
   // ==========================================================================
-  // Preset Scenarios
+  // Presets & Scenarios
   // ==========================================================================
 
   function loadPreset(scenarioKey) {
@@ -654,9 +639,6 @@
     if (presetSelect) presetSelect.value = scenarioKey;
 
     switch (scenarioKey) {
-      // ----------------------------------------------------------------------
-      // 1 Transaction Scenarios
-      // ----------------------------------------------------------------------
       case 'tx1_atomic_transfer':
         setTxCount(1);
         setBlock('T1', 1, 'READ', 'A');
@@ -672,101 +654,90 @@
         setBlock('T1', 1, 'READ', 'A');
         setBlock('T1', 2, 'WRITE', 'A', -500);
         setBlock('T1', 3, 'ROLLBACK', 'ALL');
-        showToast('Loaded 1 Tx: Aborted Overdraft Rollback (atomicity preserves baseline balance).');
+        showToast('Loaded 1 Tx: Aborted Overdraft Rollback.');
         break;
 
-      // ----------------------------------------------------------------------
-      // 2 Transaction Classic Scenarios
-      // ----------------------------------------------------------------------
       case 'lost_update':
         setTxCount(2);
-        // T1 reads A, T2 reads A, T1 updates A, T2 updates A
         setBlock('T1', 1, 'READ', 'A');
         setBlock('T2', 2, 'READ', 'A');
         setBlock('T1', 3, 'WRITE', 'A', 200);
         setBlock('T2', 4, 'WRITE', 'A', -200);
-        setBlock('T1', 5, 'COMMIT', 'A');
-        setBlock('T2', 6, 'COMMIT', 'A');
-        showToast('Loaded Lost Update scenario (T2 blind write overwrites T1).');
+        setBlock('T1', 5, 'COMMIT', 'ALL');
+        setBlock('T2', 6, 'COMMIT', 'ALL');
+        showToast('Loaded 2 Tx: Lost Update scenario.');
         break;
 
       case 'dirty_read':
         setTxCount(2);
-        // T1 writes A, T2 reads A before T1 commits, T1 rolls back
         setBlock('T1', 1, 'WRITE', 'A', 500);
         setBlock('T2', 2, 'READ', 'A');
-        setBlock('T1', 3, 'ROLLBACK', 'A');
-        setBlock('T2', 4, 'COMMIT', 'A');
-        showToast('Loaded Dirty Read scenario (T2 reads uncommitted write of aborted T1).');
+        setBlock('T1', 3, 'ROLLBACK', 'ALL');
+        setBlock('T2', 4, 'COMMIT', 'ALL');
+        showToast('Loaded 2 Tx: Dirty Read scenario.');
         break;
 
       case 'non_repeatable_read':
         setTxCount(2);
-        // T1 reads A, T2 writes A and commits, T1 reads A again seeing different value
         setBlock('T1', 1, 'READ', 'A');
-        setBlock('T2', 2, 'WRITE', 'A', 400);
-        setBlock('T2', 3, 'COMMIT', 'A');
+        setBlock('T2', 2, 'WRITE', 'A', 300);
+        setBlock('T2', 3, 'COMMIT', 'ALL');
         setBlock('T1', 4, 'READ', 'A');
-        setBlock('T1', 5, 'COMMIT', 'A');
-        showToast('Loaded Non-Repeatable Read scenario.');
+        setBlock('T1', 5, 'COMMIT', 'ALL');
+        showToast('Loaded 2 Tx: Non-Repeatable Read scenario.');
         break;
 
       case 'write_skew':
         setTxCount(2);
-        // T1 reads A, B, writes A. T2 reads A, B, writes B.
         setBlock('T1', 1, 'READ', 'A');
-        setBlock('T1', 2, 'READ', 'B');
-        setBlock('T2', 3, 'READ', 'A');
-        setBlock('T2', 4, 'READ', 'B');
-        setBlock('T1', 5, 'WRITE', 'A', -400);
-        setBlock('T2', 6, 'WRITE', 'B', -400);
-        setBlock('T1', 7, 'COMMIT', 'A');
-        setBlock('T2', 8, 'COMMIT', 'B');
-        showToast('Loaded Write Skew scenario.');
+        setBlock('T2', 2, 'READ', 'B');
+        setBlock('T1', 3, 'WRITE', 'B', -300);
+        setBlock('T2', 4, 'WRITE', 'A', -300);
+        setBlock('T1', 5, 'COMMIT', 'ALL');
+        setBlock('T2', 6, 'COMMIT', 'ALL');
+        showToast('Loaded 2 Tx: Write Skew scenario.');
         break;
 
       case 'deadlock_cycle':
         setTxCount(2);
-        // T1 writes A, T2 writes B, T1 writes B (blocked), T2 writes A (deadlock loop)
-        setBlock('T1', 1, 'WRITE', 'A', 100);
-        setBlock('T2', 2, 'WRITE', 'B', 100);
-        setBlock('T1', 3, 'WRITE', 'B', 100);
-        setBlock('T2', 4, 'WRITE', 'A', 100);
-        showToast('Loaded Serialization Cycle dependency loop.');
+        setBlock('T1', 1, 'WRITE', 'A', 200);
+        setBlock('T2', 2, 'WRITE', 'B', 200);
+        setBlock('T1', 3, 'WRITE', 'B', 200);
+        setBlock('T2', 4, 'WRITE', 'A', 200);
+        setBlock('T1', 5, 'COMMIT', 'ALL');
+        setBlock('T2', 6, 'COMMIT', 'ALL');
+        showToast('Loaded 2 Tx: Serialization Cycle / 2-Way Deadlock.');
         break;
 
       case 'serial_safe':
         setTxCount(2);
         setBlock('T1', 1, 'READ', 'A');
-        setBlock('T1', 2, 'WRITE', 'A', 200);
-        setBlock('T1', 3, 'COMMIT', 'A');
+        setBlock('T1', 2, 'WRITE', 'A', 150);
+        setBlock('T1', 3, 'COMMIT', 'ALL');
         setBlock('T2', 4, 'READ', 'A');
-        setBlock('T2', 5, 'WRITE', 'A', 300);
-        setBlock('T2', 6, 'COMMIT', 'A');
-        showToast('Loaded Safe Serial schedule.');
+        setBlock('T2', 5, 'WRITE', 'A', -150);
+        setBlock('T2', 6, 'COMMIT', 'ALL');
+        showToast('Loaded 2 Tx: Safe Serial Schedule.');
         break;
 
-      // ----------------------------------------------------------------------
-      // 3 Transaction Scenarios
-      // ----------------------------------------------------------------------
       case 'tx3_circular_deadlock':
         setTxCount(3);
-        // Circular wait: T1 holds A, wants B; T2 holds B, wants C; T3 holds C, wants A
         setBlock('T1', 1, 'WRITE', 'A', 100);
         setBlock('T2', 2, 'WRITE', 'B', 100);
         setBlock('T3', 3, 'WRITE', 'C', 100);
         setBlock('T1', 4, 'WRITE', 'B', 100);
         setBlock('T2', 5, 'WRITE', 'C', 100);
         setBlock('T3', 6, 'WRITE', 'A', 100);
-        showToast('Loaded 3 Tx: 3-Way Circular Deadlock (T1→T2→T3→T1 cycle).');
+        setBlock('T1', 7, 'COMMIT', 'ALL');
+        setBlock('T2', 8, 'COMMIT', 'ALL');
+        showToast('Loaded 3 Tx: 3-Way Circular Deadlock.');
         break;
 
       case 'tx3_dirty_cascade':
         setTxCount(3);
-        // T1 writes A uncommitted, T2 reads A and writes B, T3 reads B, T1 aborts!
         setBlock('T1', 1, 'WRITE', 'A', 300);
         setBlock('T2', 2, 'READ', 'A');
-        setBlock('T2', 3, 'WRITE', 'B', 300);
+        setBlock('T2', 3, 'WRITE', 'B', 200);
         setBlock('T3', 4, 'READ', 'B');
         setBlock('T1', 5, 'ROLLBACK', 'ALL');
         setBlock('T2', 6, 'COMMIT', 'ALL');
@@ -776,7 +747,6 @@
 
       case 'tx3_safe_pipeline':
         setTxCount(3);
-        // Serialized 3-step pipeline: T1 transfers from A, T2 deposits to B, T3 audits B
         setBlock('T1', 1, 'READ', 'A');
         setBlock('T1', 2, 'WRITE', 'A', -150);
         setBlock('T1', 3, 'COMMIT', 'ALL');
@@ -785,15 +755,11 @@
         setBlock('T2', 6, 'COMMIT', 'ALL');
         setBlock('T3', 7, 'READ', 'B');
         setBlock('T3', 8, 'COMMIT', 'ALL');
-        showToast('Loaded 3 Tx: Serialized Pipeline (Safe Transfer & Audit).');
+        showToast('Loaded 3 Tx: Serialized Pipeline.');
         break;
 
-      // ----------------------------------------------------------------------
-      // 4 Transaction Scenarios
-      // ----------------------------------------------------------------------
       case 'tx4_ring_deadlock':
         setTxCount(4);
-        // 4-Way Distributed Deadlock Ring: T1 holds A, T2 holds B, T3 holds C, T4 requests A...
         setBlock('T1', 1, 'WRITE', 'A', 100);
         setBlock('T2', 2, 'WRITE', 'B', 100);
         setBlock('T3', 3, 'WRITE', 'C', 100);
@@ -807,7 +773,6 @@
 
       case 'tx4_multi_hazard':
         setTxCount(4);
-        // Multi-hazard storm: T1 & T2 have Lost Update on A, T3 & T4 have Dirty Read on B
         setBlock('T1', 1, 'READ', 'A');
         setBlock('T2', 2, 'READ', 'A');
         setBlock('T1', 3, 'WRITE', 'A', 200);
@@ -816,12 +781,11 @@
         setBlock('T4', 6, 'READ', 'B');
         setBlock('T3', 7, 'ROLLBACK', 'ALL');
         setBlock('T4', 8, 'COMMIT', 'ALL');
-        showToast('Loaded 4 Tx: Multi-Hazard Storm (Lost Update on A + Dirty Read on B).');
+        showToast('Loaded 4 Tx: Multi-Hazard Storm.');
         break;
 
       case 'tx4_safe_settlement':
         setTxCount(4);
-        // Safe batch settlement across all 4 transactions
         setBlock('T1', 1, 'WRITE', 'A', 100);
         setBlock('T1', 2, 'COMMIT', 'ALL');
         setBlock('T2', 3, 'WRITE', 'B', -100);
@@ -830,7 +794,7 @@
         setBlock('T3', 6, 'COMMIT', 'ALL');
         setBlock('T4', 7, 'READ', 'A');
         setBlock('T4', 8, 'COMMIT', 'ALL');
-        showToast('Loaded 4 Tx: Concurrent Batch Settlement (Safe Serializable).');
+        showToast('Loaded 4 Tx: Concurrent Batch Settlement.');
         break;
     }
   }
@@ -841,25 +805,17 @@
     txCountButtons.forEach(b => {
       b.classList.toggle('active', parseInt(b.getAttribute('data-count'), 10) === count);
     });
-    renderTimelines();
+    renderVerticalSchedule();
     updateGlobalSequenceUI();
   }
 
   function setBlock(tx, step, op, account, amount = 0) {
-    let slot = document.querySelector(`.timeline-slot[data-tx="${tx}"][data-step="${step}"]`);
-    if (!slot) {
-      const track = document.getElementById(`track_${tx}`);
-      if (track) {
-        let currentCount = track.querySelectorAll('.timeline-slot').length;
-        while (currentCount < step) {
-          currentCount++;
-          const newSlot = createSlotElement(tx, currentCount);
-          track.appendChild(newSlot);
-        }
-        updateGlobalStepBar();
-        slot = document.querySelector(`.timeline-slot[data-tx="${tx}"][data-step="${step}"]`);
+    if (step > STATE.maxSteps) {
+      while (STATE.maxSteps < step) {
+        addStepRow();
       }
     }
+    const slot = document.querySelector(`.timeline-slot[data-tx="${tx}"][data-step="${step}"]`);
     if (slot) {
       window.DragDropModule.placeBlockInSlot(slot, {
         txId: tx,
@@ -872,15 +828,8 @@
     }
   }
 
-  function populateTimelineFromSchedule(schedule) {
-    clearAllSlots();
-    schedule.forEach(s => {
-      setBlock(s.txId, s.stepIndex, s.op, s.account, s.amount);
-    });
-  }
-
   // ==========================================================================
-  // Accounts Balance UI
+  // Accounts Balance UI & Palette Live Amount Preview
   // ==========================================================================
 
   async function fetchAccountBalances() {
@@ -895,13 +844,47 @@
     }
   }
 
+  function updatePalettePreview() {
+    const acc = paletteAccount ? paletteAccount.value : 'A';
+    const delta = paletteDelta ? parseFloat(paletteDelta.value) : 200;
+    const currentBal = STATE.accounts[acc] !== undefined ? STATE.accounts[acc] : 1000;
+    const sign = delta >= 0 ? '+' : '';
+    const newBal = currentBal + delta;
+
+    if (paletteReadAccountBadge) {
+      paletteReadAccountBadge.textContent = `(Account ${acc})`;
+    }
+    if (paletteReadDesc) {
+      paletteReadDesc.textContent = `SELECT balance (Current: $${currentBal.toFixed(2)})`;
+    }
+    if (paletteWriteAmountBadge) {
+      paletteWriteAmountBadge.textContent = `(${sign}$${Math.abs(delta).toFixed(2)})`;
+    }
+    if (paletteWriteDesc) {
+      paletteWriteDesc.textContent = `UPDATE balance by ${sign}$${Math.abs(delta).toFixed(2)} (New: $${newBal.toFixed(2)})`;
+    }
+  }
+
   function updateBalancesUI(accounts) {
     if (!accounts) return;
     accounts.forEach(a => {
+      STATE.accounts[a.accountCode] = a.balance;
       if (a.accountCode === 'A' && balA) balA.textContent = `$${a.balance.toFixed(2)}`;
       if (a.accountCode === 'B' && balB) balB.textContent = `$${a.balance.toFixed(2)}`;
       if (a.accountCode === 'C' && balC) balC.textContent = `$${a.balance.toFixed(2)}`;
     });
+
+    // Update account select options with proper live amounts in the DB
+    if (paletteAccount) {
+      const curSelected = paletteAccount.value;
+      paletteAccount.innerHTML = `
+        <option value="A" ${curSelected === 'A' ? 'selected' : ''}>Account A ($${(STATE.accounts['A'] || 1000).toFixed(2)})</option>
+        <option value="B" ${curSelected === 'B' ? 'selected' : ''}>Account B ($${(STATE.accounts['B'] || 1000).toFixed(2)})</option>
+        <option value="C" ${curSelected === 'C' ? 'selected' : ''}>Account C ($${(STATE.accounts['C'] || 1000).toFixed(2)})</option>
+      `;
+    }
+
+    updatePalettePreview();
   }
 
   // ==========================================================================
@@ -909,14 +892,15 @@
   // ==========================================================================
 
   function showToast(message) {
-    const toastContainer = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    if (!toast || !toastMessage) return;
+    toastMessage.textContent = message;
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    toast.classList.add('translate-y-0', 'opacity-100');
     setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 300);
+      toast.classList.remove('translate-y-0', 'opacity-100');
+      toast.classList.add('translate-y-20', 'opacity-0');
     }, 3500);
   }
 

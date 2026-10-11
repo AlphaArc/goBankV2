@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer utilities {
-  /* Sleek custom scrollbars for horizontal timeline sliders */
+  /* Sleek custom scrollbars for vertical schedule and trace logs */
   .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
     height: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -18,8 +19,10 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(56, 189, 248, 0.65);
   }
-  .custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(56, 189, 248, 0.35) rgba(15, 23, 42, 0.7);
-  }
 }
+
+/* Schedule Grid Layouts */
+.schedule-grid-1 { grid-template-columns: 56px repeat(1, minmax(0, 1fr)) !important; }
+.schedule-grid-2 { grid-template-columns: 56px repeat(2, minmax(0, 1fr)) !important; }
+.schedule-grid-3 { grid-template-columns: 56px repeat(3, minmax(0, 1fr)) !important; }
+.schedule-grid-4 { grid-template-columns: 56px repeat(4, minmax(0, 1fr)) !important; }

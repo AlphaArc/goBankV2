@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.3.0] - 2026-10-12
+
+### Added & Refactored
+- **Phase 9: Vertical Schedule Matrix Architecture & Left Sidebar Stack**:
+  - **Left Sidebar Layout Realignment**: Moved **Hazard Analysis**, **Precedence Graph (Serialization Graph)**, and **MySQL InnoDB Trace Console** to the left sidebar (`lg:col-span-5 xl:col-span-4`), positioned directly beneath the **Operation Blocks** palette.
+  - **Vertical Textbook Matrix**: Completely removed old horizontal timeline UI code and rewrote the **Concurrent Timelines** from scratch as a vertical schedule matrix where transactions form columns ($T_1 \dots T_4$) and execution steps flow vertically downwards ($S_1 \dots S_N$).
+  - **Anti-Overlap Mathematical Grid**: Built with `schedule-grid-N` classes and explicit CSS grid column templates (`56px repeat(N, minmax(0, 1fr))`) guaranteeing zero overlap or clipping between step markers, slots, and transaction cards across all screen sizes.
+  - **Read-Only Placed Blocks**: Removed inline `<select>` and `<input>` controls from placed blocks inside timelines. Dropped blocks render sleek, static badges (`READ(A)`, `WRITE(A, +$200)`, `COMMIT`, `ROLLBACK`) with single-click remove buttons and drag-to-reorder capabilities.
+  - **Live DB Balance Synchronization**: Synced the Operation Blocks palette directly with MySQL live balances (`/api/accounts`, `/simulate`, and `/api/reset`), dynamically updating account options, `SELECT` previews, and `UPDATE` net balances.
+  - **Unwrapped Safe Execution Handler**: Fortified `runSafeExecution` in `app.js` to seamlessly extract the resolved simulation payload from `/execute-safe`.
+
+---
+
 ## [1.2.0] - 2026-10-12
 
 ### Added
