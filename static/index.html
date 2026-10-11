@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>goBank | DBMS Concurrency & Serialization Hazard Visualizer</title>
+  <meta name="description" content="Interactive visualization of database transaction anomalies, serialization hazards, and Strict 2PL concurrency control against live MySQL.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Background Glow Accents -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
+
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">goBank <span class="gradient-badge">V2 SIMULATOR</span></h1>
+          <p class="brand-subtitle">DBMS Serialization Hazards & Concurrency Control Visualizer</p>
+        </div>
+      </div>
+
+      <!-- Live Bank Accounts Overview -->
+      <div class="header-accounts" id="accountsOverview">
+        <div class="account-card" id="cardAccountA">
+          <span class="acc-badge">Account A</span>
+          <span class="acc-owner">Alice Springs</span>
+          <span class="acc-balance" id="balAccountA">$1,000.00</span>
+        </div>
+        <div class="account-card" id="cardAccountB">
+          <span class="acc-badge">Account B</span>
+          <span class="acc-owner">Bob Vance</span>
+          <span class="acc-balance" id="balAccountB">$1,000.00</span>
+        </div>
+        <div class="account-card" id="cardAccountC">
+          <span class="acc-badge">Account C</span>
+          <span class="acc-owner">Charlie Day</span>
+          <span class="acc-balance" id="balAccountC">$1,000.00</span>
+        </div>
+        <button id="btnResetDB" class="btn-icon" title="Reset All Balances to $1,000">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2v6h-6"></path>
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+            <path d="M3 22v-6h6"></path>
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+          </svg>
+          <span>Reset DB</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Controls Bar -->
+    <section class="controls-bar">
+      <!-- Concurrency Selector -->
+      <div class="control-group">
+        <label for="txCountSelect" class="control-label">Concurrent Transactions:</label>
+        <div class="tx-toggle-group" id="txCountGroup">
+          <button type="button" class="tx-btn" data-count="1" id="txCountBtn1">1 Tx</button>
+          <button type="button" class="tx-btn active" data-count="2" id="txCountBtn2">2 Tx</button>
+          <button type="button" class="tx-btn" data-count="3" id="txCountBtn3">3 Tx</button>
+          <button type="button" class="tx-btn" data-count="4" id="txCountBtn4">4 Tx</button>
+        </div>
+      </div>
+
+      <!-- Presets / Quick Scenarios -->
+      <div class="control-group">
+        <label class="control-label">Educational Scenarios:</label>
+        <div class="preset-dropdown-wrap">
+          <select id="presetScenarioSelect" class="custom-select">
+            <option value="">-- Load Classic Scenario --</option>
+            <option value="lost_update">Lost Update (P4 Conflict)</option>
+            <option value="dirty_read">Dirty Read (G1 Uncommitted)</option>
+            <option value="non_repeatable_read">Non-Repeatable Read (Fuzzy Read)</option>
+            <option value="write_skew">Write Skew (Snapshot Anomaly)</option>
+            <option value="deadlock_cycle">Serialization Cycle (Dependency Loop)</option>
+            <option value="serial_safe">Safe Serial Schedule</option>
+          </select>
+          <button id="btnLoadPreset" class="btn-secondary">Load</button>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="control-group actions-wrap">
+        <button id="btnClearTimeline" class="btn-ghost" title="Clear all blocks">Clear</button>
+        <!-- Dynamic Simulate / Fix Button -->
+        <button id="btnMainAction" class="btn-primary-action simulate-state">
+          <span class="btn-spinner hidden" id="actionSpinner"></span>
+          <span class="btn-icon-span" id="actionIcon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </span>
+          <span id="actionButtonText">Simulate Schedule</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Workspace: Palette & Timelines -->
+    <main class="workspace-grid">
+      <!-- Left Column: Operations Toolbox (Drag Palette) -->
+      <aside class="palette-panel">
+        <div class="panel-header">
+          <h2>Operation Blocks</h2>
+          <span class="panel-hint">Drag into timeline slots</span>
+        </div>
+
+        <div class="palette-config">
+          <div class="config-row">
+            <label for="paletteAccount" class="sub-label">Target Account:</label>
+            <select id="paletteAccount" class="custom-select mini-select">
+              <option value="A">Account A ($1000)</option>
+              <option value="B">Account B ($1000)</option>
+              <option value="C">Account C ($1000)</option>
+            </select>
+          </div>
+          <div class="config-row">
+            <label for="paletteDelta" class="sub-label">Write Amount:</label>
+            <select id="paletteDelta" class="custom-select mini-select">
+              <option value="200">+$200 (Deposit)</option>
+              <option value="-200">-$200 (Withdraw)</option>
+              <option value="500">+$500 (Deposit)</option>
+              <option value="-500">-$500 (Withdraw)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="draggable-palette" id="blockPalette">
+          <!-- Read Block -->
+          <div class="palette-block block-read" draggable="true" data-op="READ" id="sourceBlockRead">
+            <div class="block-icon">R</div>
+            <div class="block-info">
+              <span class="block-name">Read Balance</span>
+              <span class="block-meta">SELECT balance</span>
+            </div>
+            <div class="drag-handle">⋮⋮</div>
+          </div>
+
+          <!-- Write Block -->
+          <div class="palette-block block-write" draggable="true" data-op="WRITE" id="sourceBlockWrite">
+            <div class="block-icon">W</div>
+            <div class="block-info">
+              <span class="block-name">Write / Update</span>
+              <span class="block-meta">UPDATE balance</span>
+            </div>
+            <div class="drag-handle">⋮⋮</div>
+          </div>
+
+          <!-- Commit Block -->
+          <div class="palette-block block-commit" draggable="true" data-op="COMMIT" id="sourceBlockCommit">
+            <div class="block-icon">C</div>
+            <div class="block-info">
+              <span class="block-name">Commit Tx</span>
+              <span class="block-meta">COMMIT & Release</span>
+            </div>
+            <div class="drag-handle">⋮⋮</div>
+          </div>
+
+          <!-- Rollback Block -->
+          <div class="palette-block block-rollback" draggable="true" data-op="ROLLBACK" id="sourceBlockRollback">
+            <div class="block-icon">AB</div>
+            <div class="block-info">
+              <span class="block-name">Abort / Rollback</span>
+              <span class="block-meta">ROLLBACK changes</span>
+            </div>
+            <div class="drag-handle">⋮⋮</div>
+          </div>
+        </div>
+
+        <div class="palette-instructions">
+          <h3>Interactive Guide</h3>
+          <ul>
+            <li><strong>Global Execution Order:</strong> Time flows from left to right across all transaction timelines.</li>
+            <li><strong>Step Numbering:</strong> Slots determine the exact interleaved sequence sent to MySQL.</li>
+            <li><strong>Conflicts:</strong> Interleaving Reads and Writes on the same account triggers hazard warnings.</li>
+          </ul>
+        </div>
+      </aside>
+
+      <!-- Center Column: Multi-Transaction Timelines -->
+      <section class="timeline-container">
+        <div class="timeline-header">
+          <div class="timeline-title-wrap">
+            <h2>Concurrent Timelines</h2>
+            <p class="timeline-subtitle">Time order increases from Step 1 through Step 8</p>
+          </div>
+          <div class="time-axis-indicator">
+            <span>START (T0)</span>
+            <div class="axis-arrow"></div>
+            <span>EXECUTION ORDER &rarr;</span>
+          </div>
+        </div>
+
+        <!-- Dynamic Timelines Area -->
+        <div class="timelines-list" id="timelinesList">
+          <!-- Timelines for T1..T4 injected by app.js -->
+        </div>
+
+        <!-- Live Step Bar Indicator -->
+        <div class="global-timeline-bar" id="globalStepBar">
+          <div class="step-marker" data-step="1">Step 1</div>
+          <div class="step-marker" data-step="2">Step 2</div>
+          <div class="step-marker" data-step="3">Step 3</div>
+          <div class="step-marker" data-step="4">Step 4</div>
+          <div class="step-marker" data-step="5">Step 5</div>
+          <div class="step-marker" data-step="6">Step 6</div>
+          <div class="step-marker" data-step="7">Step 7</div>
+          <div class="step-marker" data-step="8">Step 8</div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Section: Conflict Analysis, Graph & Execution Logs -->
+    <section class="results-grid" id="resultsSection">
+      <!-- Serialization Conflict & Hazard Card -->
+      <div class="result-card" id="hazardsCard">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="status-indicator-dot" id="statusDot"></div>
+            <h3>Conflict & Hazard Analysis</h3>
+          </div>
+          <span class="badge-status" id="serializableBadge">Idle</span>
+        </div>
+        <div class="card-body" id="hazardsContent">
+          <div class="empty-state">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <p>Arrange operation blocks above and click <strong>Simulate Schedule</strong> to analyze serializability and detect anomalies.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Precedence Graph (Serialization Graph) Visualizer -->
+      <div class="result-card" id="graphCard">
+        <div class="card-header">
+          <h3>Precedence Graph $P(S)$</h3>
+          <span class="graph-legend">Directed Conflict Edges</span>
+        </div>
+        <div class="card-body graph-container" id="graphCanvas">
+          <svg id="precedenceSvg" width="100%" height="220" viewBox="0 0 450 220"></svg>
+        </div>
+      </div>
+
+      <!-- Live MySQL Execution Trace -->
+      <div class="result-card" id="executionTraceCard">
+        <div class="card-header">
+          <h3>MySQL InnoDB Execution Trace</h3>
+          <span class="trace-meta" id="traceMeta">Live DB Step Logs</span>
+        </div>
+        <div class="card-body trace-logs" id="traceLogContainer">
+          <div class="empty-state">
+            <p>Execution logs and lock events will appear here during simulation.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Status Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+  </div>
+
+  <script src="js/dragdrop.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
