@@ -86,13 +86,29 @@
         <label class="control-label">Educational Scenarios:</label>
         <div class="preset-dropdown-wrap">
           <select id="presetScenarioSelect" class="custom-select">
-            <option value="">-- Load Classic Scenario --</option>
-            <option value="lost_update">Lost Update (P4 Conflict)</option>
-            <option value="dirty_read">Dirty Read (G1 Uncommitted)</option>
-            <option value="non_repeatable_read">Non-Repeatable Read (Fuzzy Read)</option>
-            <option value="write_skew">Write Skew (Snapshot Anomaly)</option>
-            <option value="deadlock_cycle">Serialization Cycle (Dependency Loop)</option>
-            <option value="serial_safe">Safe Serial Schedule</option>
+            <option value="">-- Load Scenario Preset --</option>
+            <optgroup label="1 Transaction (Single Lifecycle)">
+              <option value="tx1_atomic_transfer">1 Tx: Atomic Account Transfer (A → B)</option>
+              <option value="tx1_aborted_rollback">1 Tx: Aborted Overdraft Rollback</option>
+            </optgroup>
+            <optgroup label="2 Transactions (Classic Anomalies)">
+              <option value="lost_update" selected>2 Tx: Lost Update (P4 Conflict)</option>
+              <option value="dirty_read">2 Tx: Dirty Read (G1 Hazard)</option>
+              <option value="non_repeatable_read">2 Tx: Non-Repeatable Read (Fuzzy Read)</option>
+              <option value="write_skew">2 Tx: Write Skew (Snapshot Anomaly)</option>
+              <option value="deadlock_cycle">2 Tx: Serialization Cycle (2-Way Deadlock)</option>
+              <option value="serial_safe">2 Tx: Safe Serial Schedule</option>
+            </optgroup>
+            <optgroup label="3 Transactions (Multi-Tx Hazards & 3-Way Deadlock)">
+              <option value="tx3_circular_deadlock">3 Tx: 3-Way Circular Deadlock (T1→T2→T3→T1)</option>
+              <option value="tx3_dirty_cascade">3 Tx: Cascading Dirty Read & Inconsistent Analysis</option>
+              <option value="tx3_safe_pipeline">3 Tx: Serialized Pipeline (Safe Transfer & Audit)</option>
+            </optgroup>
+            <optgroup label="4 Transactions (High Concurrency & Distributed Rings)">
+              <option value="tx4_ring_deadlock">4 Tx: 4-Way Distributed Deadlock Ring</option>
+              <option value="tx4_multi_hazard">4 Tx: Multi-Hazard Storm (Lost Update + Dirty Read)</option>
+              <option value="tx4_safe_settlement">4 Tx: Concurrent Batch Settlement (Safe)</option>
+            </optgroup>
           </select>
           <button id="btnLoadPreset" class="btn-secondary">Load</button>
         </div>

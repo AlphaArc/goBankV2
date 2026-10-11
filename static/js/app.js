@@ -52,17 +52,27 @@
 
   function setupEventListeners() {
     // Transaction Count Selector (Dropdown & Button Group)
+    function handleTxCountChange(count) {
+      setTxCount(count);
+      const defaultPresets = {
+        1: 'tx1_atomic_transfer',
+        2: 'lost_update',
+        3: 'tx3_circular_deadlock',
+        4: 'tx4_ring_deadlock',
+      };
+      const preset = defaultPresets[count] || 'lost_update';
+      loadPreset(preset);
+    }
+
     if (txCountSelect) {
       txCountSelect.addEventListener('change', () => {
-        setTxCount(parseInt(txCountSelect.value, 10));
-        resetToSimulateState();
+        handleTxCountChange(parseInt(txCountSelect.value, 10));
       });
     }
 
     txCountButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        setTxCount(parseInt(btn.getAttribute('data-count'), 10));
-        resetToSimulateState();
+        handleTxCountChange(parseInt(btn.getAttribute('data-count'), 10));
       });
     });
 
@@ -458,13 +468,31 @@
     precedenceSvg.innerHTML = '';
     const edges = analysis.precedenceEdges || [];
 
-    // Node coordinates based on TxCount
-    const nodes = {
-      T1: { x: 80,  y: 70,  color: '#38bdf8' },
-      T2: { x: 370, y: 70,  color: '#a855f7' },
-      T3: { x: 80,  y: 170, color: '#f59e0b' },
-      T4: { x: 370, y: 170, color: '#10b981' },
-    };
+    // Responsive node coordinates tailored to transaction count
+    let nodes = {};
+    if (STATE.txCount === 1) {
+      nodes = {
+        T1: { x: 225, y: 110, color: '#38bdf8' },
+      };
+    } else if (STATE.txCount === 2) {
+      nodes = {
+        T1: { x: 110, y: 110, color: '#38bdf8' },
+        T2: { x: 340, y: 110, color: '#a855f7' },
+      };
+    } else if (STATE.txCount === 3) {
+      nodes = {
+        T1: { x: 225, y: 55,  color: '#38bdf8' },
+        T2: { x: 360, y: 165, color: '#a855f7' },
+        T3: { x: 90,  y: 165, color: '#f59e0b' },
+      };
+    } else {
+      nodes = {
+        T1: { x: 90,  y: 60,  color: '#38bdf8' },
+        T2: { x: 360, y: 60,  color: '#a855f7' },
+        T3: { x: 360, y: 165, color: '#f59e0b' },
+        T4: { x: 90,  y: 165, color: '#10b981' },
+      };
+    }
 
     // Defs for arrow markers
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -547,8 +575,33 @@
   function loadPreset(scenarioKey) {
     clearAllSlots();
     resetToSimulateState();
+    if (presetSelect) presetSelect.value = scenarioKey;
 
     switch (scenarioKey) {
+      // ----------------------------------------------------------------------
+      // 1 Transaction Scenarios
+      // ----------------------------------------------------------------------
+      case 'tx1_atomic_transfer':
+        setTxCount(1);
+        setBlock('T1', 1, 'READ', 'A');
+        setBlock('T1', 2, 'WRITE', 'A', -200);
+        setBlock('T1', 3, 'READ', 'B');
+        setBlock('T1', 4, 'WRITE', 'B', 200);
+        setBlock('T1', 5, 'COMMIT', 'ALL');
+        showToast('Loaded 1 Tx: Atomic Bank Transfer ($200 from A to B with COMMIT).');
+        break;
+
+      case 'tx1_aborted_rollback':
+        setTxCount(1);
+        setBlock('T1', 1, 'READ', 'A');
+        setBlock('T1', 2, 'WRITE', 'A', -500);
+        setBlock('T1', 3, 'ROLLBACK', 'ALL');
+        showToast('Loaded 1 Tx: Aborted Overdraft Rollback (atomicity preserves baseline balance).');
+        break;
+
+      // ----------------------------------------------------------------------
+      // 2 Transaction Classic Scenarios
+      // ----------------------------------------------------------------------
       case 'lost_update':
         setTxCount(2);
         // T1 reads A, T2 reads A, T1 updates A, T2 updates A
@@ -615,6 +668,93 @@
         setBlock('T2', 5, 'WRITE', 'A', 300);
         setBlock('T2', 6, 'COMMIT', 'A');
         showToast('Loaded Safe Serial schedule.');
+        break;
+
+      // ----------------------------------------------------------------------
+      // 3 Transaction Scenarios
+      // ----------------------------------------------------------------------
+      case 'tx3_circular_deadlock':
+        setTxCount(3);
+        // Circular wait: T1 holds A, wants B; T2 holds B, wants C; T3 holds C, wants A
+        setBlock('T1', 1, 'WRITE', 'A', 100);
+        setBlock('T2', 2, 'WRITE', 'B', 100);
+        setBlock('T3', 3, 'WRITE', 'C', 100);
+        setBlock('T1', 4, 'WRITE', 'B', 100);
+        setBlock('T2', 5, 'WRITE', 'C', 100);
+        setBlock('T3', 6, 'WRITE', 'A', 100);
+        showToast('Loaded 3 Tx: 3-Way Circular Deadlock (T1→T2→T3→T1 cycle).');
+        break;
+
+      case 'tx3_dirty_cascade':
+        setTxCount(3);
+        // T1 writes A uncommitted, T2 reads A and writes B, T3 reads B, T1 aborts!
+        setBlock('T1', 1, 'WRITE', 'A', 300);
+        setBlock('T2', 2, 'READ', 'A');
+        setBlock('T2', 3, 'WRITE', 'B', 300);
+        setBlock('T3', 4, 'READ', 'B');
+        setBlock('T1', 5, 'ROLLBACK', 'ALL');
+        setBlock('T2', 6, 'COMMIT', 'ALL');
+        setBlock('T3', 7, 'COMMIT', 'ALL');
+        showToast('Loaded 3 Tx: Cascading Dirty Read & Inconsistent Analysis.');
+        break;
+
+      case 'tx3_safe_pipeline':
+        setTxCount(3);
+        // Serialized 3-step pipeline: T1 transfers from A, T2 deposits to B, T3 audits B
+        setBlock('T1', 1, 'READ', 'A');
+        setBlock('T1', 2, 'WRITE', 'A', -150);
+        setBlock('T1', 3, 'COMMIT', 'ALL');
+        setBlock('T2', 4, 'READ', 'A');
+        setBlock('T2', 5, 'WRITE', 'B', 150);
+        setBlock('T2', 6, 'COMMIT', 'ALL');
+        setBlock('T3', 7, 'READ', 'B');
+        setBlock('T3', 8, 'COMMIT', 'ALL');
+        showToast('Loaded 3 Tx: Serialized Pipeline (Safe Transfer & Audit).');
+        break;
+
+      // ----------------------------------------------------------------------
+      // 4 Transaction Scenarios
+      // ----------------------------------------------------------------------
+      case 'tx4_ring_deadlock':
+        setTxCount(4);
+        // 4-Way Distributed Deadlock Ring: T1 holds A, T2 holds B, T3 holds C, T4 requests A...
+        setBlock('T1', 1, 'WRITE', 'A', 100);
+        setBlock('T2', 2, 'WRITE', 'B', 100);
+        setBlock('T3', 3, 'WRITE', 'C', 100);
+        setBlock('T4', 4, 'WRITE', 'A', 100);
+        setBlock('T1', 5, 'WRITE', 'B', 100);
+        setBlock('T2', 6, 'WRITE', 'C', 100);
+        setBlock('T3', 7, 'WRITE', 'A', 100);
+        setBlock('T4', 8, 'COMMIT', 'ALL');
+        showToast('Loaded 4 Tx: 4-Way Distributed Deadlock Ring.');
+        break;
+
+      case 'tx4_multi_hazard':
+        setTxCount(4);
+        // Multi-hazard storm: T1 & T2 have Lost Update on A, T3 & T4 have Dirty Read on B
+        setBlock('T1', 1, 'READ', 'A');
+        setBlock('T2', 2, 'READ', 'A');
+        setBlock('T1', 3, 'WRITE', 'A', 200);
+        setBlock('T2', 4, 'WRITE', 'A', -200);
+        setBlock('T3', 5, 'WRITE', 'B', 400);
+        setBlock('T4', 6, 'READ', 'B');
+        setBlock('T3', 7, 'ROLLBACK', 'ALL');
+        setBlock('T4', 8, 'COMMIT', 'ALL');
+        showToast('Loaded 4 Tx: Multi-Hazard Storm (Lost Update on A + Dirty Read on B).');
+        break;
+
+      case 'tx4_safe_settlement':
+        setTxCount(4);
+        // Safe batch settlement across all 4 transactions
+        setBlock('T1', 1, 'WRITE', 'A', 100);
+        setBlock('T1', 2, 'COMMIT', 'ALL');
+        setBlock('T2', 3, 'WRITE', 'B', -100);
+        setBlock('T2', 4, 'COMMIT', 'ALL');
+        setBlock('T3', 5, 'WRITE', 'C', 200);
+        setBlock('T3', 6, 'COMMIT', 'ALL');
+        setBlock('T4', 7, 'READ', 'A');
+        setBlock('T4', 8, 'COMMIT', 'ALL');
+        showToast('Loaded 4 Tx: Concurrent Batch Settlement (Safe Serializable).');
         break;
     }
   }

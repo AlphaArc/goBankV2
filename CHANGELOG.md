@@ -37,13 +37,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - **Automatic Victim Rollback**: Go backend catches Error 1213, rolls back the victim transaction cleanly, and surfaces the `DEADLOCK_ROLLED_BACK` event with explanatory messaging.
     - **Dynamic Button Transformation**: "Simulate Schedule" button dynamically morphs into "Fix Problem (Apply Strict 2PL)" upon anomaly detection.
     - **Visual Trace Logs**: Status badges for `⚠️ DEADLOCK ROLLED BACK`, `⏳ LOCK WAIT`, and `✓ SUCCESS` with microsecond-level query latencies.
-    - **Educational Presets**: Dropdown covering Lost Update (P4), Dirty Read (G1), Non-Repeatable Read, Write Skew, Serialization Cycle / Deadlock, and Safe Serial schedules.
+    - **Educational Presets for 1, 2, 3, & 4 Transactions**:
+      - **1 Tx**: Atomic Account Transfer (A → B) & Aborted Overdraft Rollback.
+      - **2 Tx**: Lost Update (P4), Dirty Read (G1), Non-Repeatable Read, Write Skew, Serialization Cycle / 2-Way Deadlock, and Safe Serial.
+      - **3 Tx**: 3-Way Circular Deadlock ($T_1 \to T_2 \to T_3 \to T_1$), Cascading Dirty Read & Inconsistent Analysis, and Serialized Pipeline.
+      - **4 Tx**: 4-Way Distributed Deadlock Ring, Multi-Hazard Storm (simultaneous Lost Update on A and Dirty Read on B), and Safe Batch Settlement.
+    - **Adaptive Concurrency Switching**: Changing the transaction count automatically switches timeline rows and loads representative scenarios.
   - `main.go`: Server entrypoint with environment variable configuration and graceful startup.
 - **Frontend UI & Visualization (`static/`)**:
   - Modern, responsive dark-mode interface with glassmorphism, glowing accents, and high-contrast typography (`Plus Jakarta Sans` and `JetBrains Mono`).
   - **Transaction Concurrency Selector**: Dynamic switching between 1, 2, 3, and 4 concurrent transactions ($T_1 \dots T_4$).
   - **HTML5 Drag-and-Drop Palette**: Read (`SELECT`), Write (`UPDATE`), Commit, and Rollback blocks configurable by target account and delta amounts.
-  - **Educational Preset Scenarios**: Instant loading of Lost Update, Dirty Read, Non-Repeatable Read, Write Skew, Deadlock Cycle, and Safe Serial schedules.
+  - **Educational Preset Scenarios**: Instant loading of 1, 2, 3, and 4 transaction scenarios with organized `<optgroup>` selector.
   - **Dynamic Action Button**: Automatically shifts from blue "Simulate Schedule" to an animated glowing "Fix Problem (Strict 2PL)" button when hazards are detected.
   - **Live SVG Precedence Graph**: Visualizes transaction nodes ($T_1 \dots T_4$) and directed conflict dependency edges.
   - **Live MySQL InnoDB Trace Console**: Real-time log entries showing step-by-step SQL operations, row-level locks, observed balances, and lock wait timeouts.

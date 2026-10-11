@@ -151,10 +151,22 @@ goBankV2/
   - When circular lock dependencies occur (e.g. $T_1$ holds A and requests B, while $T_2$ holds B and requests A), MySQL's InnoDB deadlock engine detects the cycle.
   - The Go backend catches Error 1213, automatically rolls back the chosen victim transaction, and issues a clean state restoration.
   - The UI highlights the victim transaction with a `DEADLOCK ROLLED BACK` badge and notifies the user.
-- **Educational Presets**:
-  - **Lost Update (P4 Conflict)**: Interleaved read-modify-write resulting in an overwritten balance.
-  - **Dirty Read (G1 Hazard)**: Reading uncommitted state from an aborted transaction.
-  - **Non-Repeatable Read**: Re-reading modified and committed data within an open transaction.
-  - **Write Skew**: Snapshot anomaly across multiple related records.
-  - **Serialization Cycle**: Circular lock dependencies triggering real MySQL Error 1213 deadlocks.
-  - **Safe Serial**: Clean, serial execution with zero hazards.
+- **Educational Presets (1, 2, 3, & 4 Concurrent Transactions)**:
+  - **1 Transaction**:
+    - **Atomic Account Transfer (A → B)**: Atomic transfer with ACID consistency.
+    - **Aborted Overdraft Rollback**: Premature abort rolling back local balance changes.
+  - **2 Transactions**:
+    - **Lost Update (P4 Conflict)**: Interleaved read-modify-write resulting in an overwritten balance.
+    - **Dirty Read (G1 Hazard)**: Reading uncommitted state from an aborted transaction.
+    - **Non-Repeatable Read**: Re-reading modified and committed data within an open transaction.
+    - **Write Skew**: Snapshot anomaly across multiple related records.
+    - **Serialization Cycle**: Circular lock dependencies triggering real MySQL Error 1213 deadlocks.
+    - **Safe Serial**: Clean, serial execution with zero hazards.
+  - **3 Transactions**:
+    - **3-Way Circular Deadlock ($T_1 \to T_2 \to T_3 \to T_1$)**: Circular lock contention across 3 accounts ($A, B, C$) resolved by InnoDB deadlock detection.
+    - **Cascading Dirty Read**: $T_2$ reads uncommitted $T_1$, $T_3$ reads tainted $T_2$, and $T_1$ aborts.
+    - **Serialized Pipeline**: Multi-stage transfer and balance audit pipeline.
+  - **4 Transactions**:
+    - **4-Way Distributed Deadlock Ring**: Multi-hop lock contention cycle spanning 4 concurrent workers.
+    - **Multi-Hazard Storm**: Simultaneous Lost Update on Account $A$ and Dirty Read on Account $B$.
+    - **Concurrent Batch Settlement**: High-concurrency safe serialized schedule.
