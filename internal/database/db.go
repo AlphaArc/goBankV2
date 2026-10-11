@@ -184,10 +184,20 @@ func (m *DBManager) ExecuteSimulation(req models.SimulationRequest) (*models.Sim
 		return nil, fmt.Errorf("failed to fetch final accounts: %w", err)
 	}
 
+	hasDeadlock := false
+	for _, l := range execLogs {
+		if l.Status == "DEADLOCK_ROLLED_BACK" {
+			hasDeadlock = true
+			break
+		}
+	}
+
 	resolved := (req.ControlMode == models.ModeStrict2PL) || !analysis.HasHazards
 	resMsg := "Simulation completed."
-	if req.ControlMode == models.ModeStrict2PL {
-		resMsg = "Strict Two-Phase Locking (S2PL) enforced. Exclusive locks on rows prevented conflicting dirty reads and lost updates."
+	if hasDeadlock {
+		resMsg = "⚠️ MySQL Deadlock (Error 1213) detected! InnoDB wait-for graph found a cycle. A victim transaction was automatically rolled back to preserve database consistency."
+	} else if req.ControlMode == models.ModeStrict2PL {
+		resMsg = "Strict Two-Phase Locking (S2PL) enforced. Exclusive locks on rows (SELECT ... FOR UPDATE) prevented conflicting dirty reads and lost updates."
 	} else if analysis.HasHazards {
 		resMsg = fmt.Sprintf("Anomalies observed! %d hazard(s) detected during timeline execution.", len(analysis.Hazards))
 	}
@@ -245,12 +255,18 @@ func (m *DBManager) runTransactionWorker(parentCtx context.Context, txID string,
 			logEntry.DurationMs = time.Since(stepStart).Milliseconds()
 
 			if err != nil {
-				if strings.Contains(err.Error(), "Lock wait timeout") {
+				errStr := err.Error()
+				if strings.Contains(errStr, "Deadlock found") || strings.Contains(errStr, "1213") {
+					logEntry.Status = "DEADLOCK_ROLLED_BACK"
+					logEntry.Detail = fmt.Sprintf("⚠️ DEADLOCK DETECTED (Error 1213)! InnoDB chose %s as victim. Automatically rolled back to release locks.", txID)
+					_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
+					_, _ = conn.ExecContext(context.Background(), "START TRANSACTION")
+				} else if strings.Contains(errStr, "Lock wait timeout") {
 					logEntry.Status = "BLOCKED_WAIT"
 					logEntry.Detail = fmt.Sprintf("Lock wait timeout: Another transaction holds an exclusive lock on Account %s", step.Account)
 				} else {
 					logEntry.Status = "FAILED"
-					logEntry.Detail = err.Error()
+					logEntry.Detail = errStr
 				}
 			} else {
 				logEntry.Status = "SUCCESS"
@@ -274,12 +290,18 @@ func (m *DBManager) runTransactionWorker(parentCtx context.Context, txID string,
 			logEntry.DurationMs = time.Since(stepStart).Milliseconds()
 
 			if err != nil {
-				if strings.Contains(err.Error(), "Lock wait timeout") {
+				errStr := err.Error()
+				if strings.Contains(errStr, "Deadlock found") || strings.Contains(errStr, "1213") {
+					logEntry.Status = "DEADLOCK_ROLLED_BACK"
+					logEntry.Detail = fmt.Sprintf("⚠️ DEADLOCK DETECTED (Error 1213)! InnoDB chose %s as victim. Automatically rolled back to break lock cycle.", txID)
+					_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
+					_, _ = conn.ExecContext(context.Background(), "START TRANSACTION")
+				} else if strings.Contains(errStr, "Lock wait timeout") {
 					logEntry.Status = "BLOCKED_WAIT"
 					logEntry.Detail = fmt.Sprintf("Lock wait timeout on Account %s update: Blocked by active lock", step.Account)
 				} else {
 					logEntry.Status = "FAILED"
-					logEntry.Detail = err.Error()
+					logEntry.Detail = errStr
 				}
 			} else {
 				// Query new balance to record in log

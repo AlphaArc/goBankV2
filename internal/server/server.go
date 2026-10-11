@@ -53,7 +53,8 @@ func (s *Server) routes(staticDir string) {
 	s.router.HandleFunc("/api/analyze", s.handleAnalyze)
 	s.router.HandleFunc("/api/simulate", s.handleSimulate)
 	s.router.HandleFunc("/simulate", s.handleSimulate) // Convenience alias for Phase 2 testing
-	s.router.HandleFunc("/api/fix", s.handleFix)
+	s.router.HandleFunc("/execute-safe", s.handleExecuteSafe) // Phase 5 Conflict Resolution endpoint
+	s.router.HandleFunc("/api/fix", s.handleExecuteSafe)
 }
 
 func (s *Server) handleGetAccounts(w http.ResponseWriter, r *http.Request) {
