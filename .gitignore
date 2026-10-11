@@ -1,0 +1,33 @@
+# Windows specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.bat
+*.cmd
+*.ps1
+Thumbs.db
+desktop.ini
+
+# Go environment
+bin/
+pkg/
+vendor/
+go.sum
+
+# Environment variables (NEVER commit database credentials)
+.env
+*.local
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific (just in case)
+.DS_Store
+
+# Logs
+*.log

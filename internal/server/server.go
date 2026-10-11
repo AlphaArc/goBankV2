@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"goBankV2/internal/analyzer"
 	"goBankV2/internal/database"
@@ -44,7 +45,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes(staticDir string) {
 	// Static UI file server
-	fs := http.FileServer(http.Dir(staticDir))
+	cleanDir := filepath.Clean(staticDir)
+	fs := http.FileServer(http.Dir(cleanDir))
 	s.router.Handle("/", fs)
 
 	// REST API endpoints

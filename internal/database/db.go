@@ -20,6 +20,103 @@ type DBManager struct {
 	db *sql.DB
 }
 
+// AutoInitAndConnect connects to MySQL, auto-creates database & tables if missing,
+// and returns a ready-to-use DBManager. It provides Windows-friendly diagnostics on common connection failures.
+func AutoInitAndConnect(dbUser, dbPass, dbHost, dbPort, dbName string) (*DBManager, error) {
+	var authPart string
+	if dbPass != "" {
+		authPart = fmt.Sprintf("%s:%s", dbUser, dbPass)
+	} else {
+		authPart = dbUser
+	}
+
+	// 1. First connect to MySQL instance root (without target db) to ensure server is reachable and database exists
+	serverDSN := fmt.Sprintf("%s@tcp(%s:%s)/?parseTime=true&multiStatements=true&interpolateParams=true", authPart, dbHost, dbPort)
+	rootDB, err := sql.Open("mysql", serverDSN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open MySQL driver: %w", err)
+	}
+	defer rootDB.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := rootDB.PingContext(ctx); err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "Access denied") || strings.Contains(errStr, "1045") {
+			return nil, fmt.Errorf("MySQL Authentication Failed for user '%s'.\nIf your local MySQL root user has a password, specify it via:\n  PowerShell: $env:DB_PASS = 'yourpassword'\n  CMD:        set DB_PASS=yourpassword\nOriginal error: %w", dbUser, err)
+		}
+		if strings.Contains(errStr, "actively refused") || strings.Contains(errStr, "connection refused") || strings.Contains(errStr, "timeout") {
+			return nil, fmt.Errorf("Could not connect to MySQL at %s:%s. Please ensure MySQL is running on your Windows PC.\nTip: Open 'services.msc' in Windows and verify the 'MySQL' service is Running, or run 'net start MySQL' as Administrator.\nOriginal error: %w", dbHost, dbPort, err)
+		}
+		return nil, fmt.Errorf("failed to connect to MySQL server at %s:%s: %w", dbHost, dbPort, err)
+	}
+
+	// 2. Ensure database exists
+	createDBSQL := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;", dbName)
+	if _, err := rootDB.ExecContext(ctx, createDBSQL); err != nil {
+		return nil, fmt.Errorf("failed to auto-create database '%s': %w", dbName, err)
+	}
+
+	// 3. Connect to the target database
+	dbDSN := fmt.Sprintf("%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&interpolateParams=true", authPart, dbHost, dbPort, dbName)
+	targetDB, err := sql.Open("mysql", dbDSN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database '%s': %w", dbName, err)
+	}
+
+	targetDB.SetMaxOpenConns(25)
+	targetDB.SetMaxIdleConns(10)
+	targetDB.SetConnMaxLifetime(5 * time.Minute)
+
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer pingCancel()
+	if err := targetDB.PingContext(pingCtx); err != nil {
+		targetDB.Close()
+		return nil, fmt.Errorf("failed to ping database '%s': %w", dbName, err)
+	}
+
+	// 4. Ensure schema tables exist
+	schemaDDL := `
+	CREATE TABLE IF NOT EXISTS accounts (
+		id INT AUTO_INCREMENT PRIMARY KEY,
+		account_code VARCHAR(10) NOT NULL UNIQUE,
+		owner_name VARCHAR(100) NOT NULL,
+		balance DECIMAL(15, 2) NOT NULL DEFAULT 1000.00,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	) ENGINE=InnoDB;
+
+	CREATE TABLE IF NOT EXISTS simulation_logs (
+		id INT AUTO_INCREMENT PRIMARY KEY,
+		simulation_uuid VARCHAR(64) NOT NULL,
+		step_index INT NOT NULL,
+		tx_id VARCHAR(10) NOT NULL,
+		operation VARCHAR(20) NOT NULL,
+		account_code VARCHAR(10) NOT NULL,
+		delta_amount DECIMAL(15, 2) DEFAULT 0.00,
+		observed_balance DECIMAL(15, 2) DEFAULT NULL,
+		status VARCHAR(30) NOT NULL,
+		duration_ms INT NOT NULL,
+		details TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	) ENGINE=InnoDB;
+
+	INSERT IGNORE INTO accounts (account_code, owner_name, balance) VALUES
+	('A', 'Alice Springs', 1000.00),
+	('B', 'Bob Vance', 1000.00),
+	('C', 'Charlie Day', 1000.00);
+	`
+	initCtx, initCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer initCancel()
+	if _, err := targetDB.ExecContext(initCtx, schemaDDL); err != nil {
+		targetDB.Close()
+		return nil, fmt.Errorf("failed to ensure database schema tables: %w", err)
+	}
+
+	log.Printf("Successfully connected to MySQL database '%s' at %s:%s (schema verified).", dbName, dbHost, dbPort)
+	return &DBManager{db: targetDB}, nil
+}
+
 // NewDBManager creates a verified MySQL connection.
 func NewDBManager(dsn string) (*DBManager, error) {
 	db, err := sql.Open("mysql", dsn)

@@ -43,7 +43,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
       - **3 Tx**: 3-Way Circular Deadlock ($T_1 \to T_2 \to T_3 \to T_1$), Cascading Dirty Read & Inconsistent Analysis, and Serialized Pipeline.
       - **4 Tx**: 4-Way Distributed Deadlock Ring, Multi-Hazard Storm (simultaneous Lost Update on A and Dirty Read on B), and Safe Batch Settlement.
     - **Adaptive Concurrency Switching**: Changing the transaction count automatically switches timeline rows and loads representative scenarios.
-  - `main.go`: Server entrypoint with environment variable configuration and graceful startup.
+  - **Windows PC Compatibility & Zero-Config Auto-Provisioning**:
+    - **Zero-Config Database Auto-Provisioning (`database.AutoInitAndConnect`)**: Server automatically verifies server connection, creates `gobank_sim` database, builds InnoDB tables, and seeds default accounts without requiring manual SQL file imports.
+    - **Windows Diagnostics**: Actionable error reporting on common Windows connection pitfalls (e.g. MySQL Windows service stopped, password mismatch, port conflict).
+    - **Clean Cross-Platform Repository Structure**: Removed local shell scripts; added `.bat`, `.cmd`, and `.ps1` to `.gitignore` to keep repository clean and cross-platform.
+    - **Windows-Specific Documentation (`README.md`)**: Comprehensive guide covering winget installation for Go and MySQL, Windows PowerShell environment variables, and Windows troubleshooting.
 - **Frontend UI & Visualization (`static/`)**:
   - Modern, responsive dark-mode interface with glassmorphism, glowing accents, and high-contrast typography (`Plus Jakarta Sans` and `JetBrains Mono`).
   - **Transaction Concurrency Selector**: Dynamic switching between 1, 2, 3, and 4 concurrent transactions ($T_1 \dots T_4$).
@@ -53,5 +57,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - **Live SVG Precedence Graph**: Visualizes transaction nodes ($T_1 \dots T_4$) and directed conflict dependency edges.
   - **Live MySQL InnoDB Trace Console**: Real-time log entries showing step-by-step SQL operations, row-level locks, observed balances, and lock wait timeouts.
 - **Comprehensive Documentation**:
-  - `README.md`: Detailed prerequisites, installation instructions, architecture overview, API specifications, and troubleshooting guide.
+  - `README.md`: Detailed Windows prerequisites, installation instructions, architecture overview, API specifications, and troubleshooting guide.
   - `CHANGELOG.md`: Detailed history of changes and milestones.

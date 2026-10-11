@@ -92,10 +92,20 @@ func AnalyzeSchedule(schedule []models.TimelineStep) models.AnalysisResult {
 
 		for _, v := range adjList[u] {
 			if visited[v] == 1 {
-				// Cycle detected!
+				// Cycle detected! Extract exact cycle sub-path starting at v
 				hasCycle = true
-				cycleNodes = append(cycleNodes, path...)
-				cycleNodes = append(cycleNodes, v)
+				cycleStart := -1
+				for idx, node := range path {
+					if node == v {
+						cycleStart = idx
+						break
+					}
+				}
+				if cycleStart >= 0 {
+					cycleNodes = append([]string{}, path[cycleStart:]...)
+				} else {
+					cycleNodes = append([]string{}, path...)
+				}
 				return true
 			}
 			if visited[v] == 0 {
@@ -108,7 +118,14 @@ func AnalyzeSchedule(schedule []models.TimelineStep) models.AnalysisResult {
 		return false
 	}
 
+	// Deterministic traversal over sorted transaction identifiers
+	sortedTxs := make([]string, 0, len(allTxMap))
 	for tx := range allTxMap {
+		sortedTxs = append(sortedTxs, tx)
+	}
+	sort.Strings(sortedTxs)
+
+	for _, tx := range sortedTxs {
 		if visited[tx] == 0 {
 			if dfs(tx, []string{}) {
 				break
@@ -157,6 +174,8 @@ func detectDirtyReads(steps []models.TimelineStep, res *models.AnalysisResult) {
 		}
 	}
 
+	reported := make(map[string]bool)
+
 	for i := 0; i < len(steps); i++ {
 		w := steps[i]
 		if w.Op != models.OpWrite {
@@ -170,8 +189,14 @@ func detectDirtyReads(steps []models.TimelineStep, res *models.AnalysisResult) {
 				continue
 			}
 
+			key := fmt.Sprintf("%s-%s-%s", w.TxID, r.TxID, w.Account)
+			if reported[key] {
+				continue
+			}
+
 			// r reads before w commits, or w never commits
 			if !hasCommit || r.StepIndex < cStep {
+				reported[key] = true
 				res.Hazards = append(res.Hazards, models.DetectedHazard{
 					Type:         models.HazardDirtyRead,
 					Title:        fmt.Sprintf("Dirty Read on Account %s", w.Account),
@@ -190,6 +215,8 @@ func detectDirtyReads(steps []models.TimelineStep, res *models.AnalysisResult) {
 // detectLostUpdates flags when concurrent transactions read same value and overwrite each other.
 func detectLostUpdates(steps []models.TimelineStep, res *models.AnalysisResult) {
 	// Pattern: R1(X) ... R2(X) ... W1(X) ... W2(X)
+	reported := make(map[string]bool)
+
 	for i := 0; i < len(steps); i++ {
 		r1 := steps[i]
 		if r1.Op != models.OpRead {
@@ -202,7 +229,13 @@ func detectLostUpdates(steps []models.TimelineStep, res *models.AnalysisResult) 
 				continue
 			}
 
+			key := fmt.Sprintf("%s-%s-%s", r1.TxID, r2.TxID, r1.Account)
+			if reported[key] {
+				continue
+			}
+
 			// Now look for W1(X) and W2(X) after both reads
+			found := false
 			for k := j + 1; k < len(steps); k++ {
 				w1 := steps[k]
 				if w1.Op != models.OpWrite || w1.TxID != r1.TxID || w1.Account != r1.Account {
@@ -212,6 +245,7 @@ func detectLostUpdates(steps []models.TimelineStep, res *models.AnalysisResult) 
 				for l := k + 1; l < len(steps); l++ {
 					w2 := steps[l]
 					if w2.Op == models.OpWrite && w2.TxID == r2.TxID && w2.Account == r1.Account {
+						reported[key] = true
 						res.Hazards = append(res.Hazards, models.DetectedHazard{
 							Type:         models.HazardLostUpdate,
 							Title:        fmt.Sprintf("Lost Update on Account %s", r1.Account),
@@ -222,7 +256,12 @@ func detectLostUpdates(steps []models.TimelineStep, res *models.AnalysisResult) 
 							Account:      r1.Account,
 							FixHint:      "Use pessimistic row locking (SELECT ... FOR UPDATE) during initial read, preventing concurrent reads until the update commits.",
 						})
+						found = true
+						break
 					}
+				}
+				if found {
+					break
 				}
 			}
 		}

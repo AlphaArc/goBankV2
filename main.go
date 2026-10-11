@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"goBankV2/internal/database"
 	"goBankV2/internal/server"
@@ -19,25 +20,17 @@ func getEnv(key, defaultVal string) string {
 
 func main() {
 	dbUser := getEnv("DB_USER", "root")
-	dbPass := getEnv("DB_PASS", "") // Default empty for initialized local instance
+	dbPass := getEnv("DB_PASS", "") // Default empty for local dev
 	dbHost := getEnv("DB_HOST", "127.0.0.1")
 	dbPort := getEnv("DB_PORT", "3306")
 	dbName := getEnv("DB_NAME", "gobank_sim")
+	host := getEnv("HOST", "127.0.0.1") // Loopback avoids Windows Firewall popups
 	port := getEnv("PORT", "8080")
 
-	var authPart string
-	if dbPass != "" {
-		authPart = fmt.Sprintf("%s:%s", dbUser, dbPass)
-	} else {
-		authPart = dbUser
-	}
-
-	dsn := fmt.Sprintf("%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true&interpolateParams=true", authPart, dbHost, dbPort, dbName)
-
 	log.Printf("Connecting to MySQL at %s:%s (database: %s)...", dbHost, dbPort, dbName)
-	dbManager, err := database.NewDBManager(dsn)
+	dbManager, err := database.AutoInitAndConnect(dbUser, dbPass, dbHost, dbPort, dbName)
 	if err != nil {
-		log.Fatalf("Fatal: Database initialization failed: %v", err)
+		log.Fatalf("\n==================================================================\n[DATABASE ERROR]\n%v\n==================================================================", err)
 	}
 	defer dbManager.Close()
 
@@ -48,11 +41,12 @@ func main() {
 		log.Println("Baseline accounts verified and reset to $1,000.00.")
 	}
 
-	srv := server.NewServer(dbManager, "./static")
+	staticDir := filepath.Join(".", "static")
+	srv := server.NewServer(dbManager, staticDir)
 
-	addr := ":" + port
+	addr := net.JoinHostPort(host, port)
 	log.Printf("==================================================================")
-	log.Printf("  goBankV2 Simulator running at http://localhost%s", addr)
+	log.Printf("  goBankV2 Simulator running at http://%s", addr)
 	log.Printf("  Open the URL above in your browser to start the simulation.")
 	log.Printf("==================================================================")
 
