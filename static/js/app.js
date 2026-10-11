@@ -13,7 +13,10 @@
 
   // DOM Elements
   const txCountButtons = document.querySelectorAll('.tx-btn');
+  const txCountSelect = document.getElementById('txCountSelect');
   const timelinesList = document.getElementById('timelinesList');
+  const sequenceStream = document.getElementById('sequenceStream');
+  const sequenceCount = document.getElementById('sequenceCount');
   const btnMainAction = document.getElementById('btnMainAction');
   const actionButtonText = document.getElementById('actionButtonText');
   const actionIcon = document.getElementById('actionIcon');
@@ -48,13 +51,17 @@
   }
 
   function setupEventListeners() {
-    // Transaction Count Toggles
+    // Transaction Count Selector (Dropdown & Button Group)
+    if (txCountSelect) {
+      txCountSelect.addEventListener('change', () => {
+        setTxCount(parseInt(txCountSelect.value, 10));
+        resetToSimulateState();
+      });
+    }
+
     txCountButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        txCountButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        STATE.txCount = parseInt(btn.getAttribute('data-count'), 10);
-        renderTimelines();
+        setTxCount(parseInt(btn.getAttribute('data-count'), 10));
         resetToSimulateState();
       });
     });
@@ -132,10 +139,49 @@
 
   function clearAllSlots() {
     document.querySelectorAll('.timeline-slot').forEach(s => s.innerHTML = '');
+    updateGlobalSequenceUI();
   }
 
   function handleScheduleModified() {
+    updateGlobalSequenceUI();
     resetToSimulateState();
+  }
+
+  function updateGlobalSequenceUI() {
+    if (!sequenceStream) return;
+    const schedule = extractScheduleFromDOM();
+    if (sequenceCount) {
+      sequenceCount.textContent = `${schedule.length} operation${schedule.length === 1 ? '' : 's'}`;
+    }
+
+    if (schedule.length === 0) {
+      sequenceStream.innerHTML = '<span class="sequence-empty">No operations placed — drag blocks into timelines above</span>';
+      return;
+    }
+
+    sequenceStream.innerHTML = '';
+    schedule.forEach((s, idx) => {
+      const pill = document.createElement('div');
+      pill.className = `seq-pill op-${s.op}`;
+
+      let label = `${s.txId}.${s.op}`;
+      if (s.op === 'READ') {
+        label += `(${s.account})`;
+      } else if (s.op === 'WRITE') {
+        const sign = s.amount >= 0 ? '+' : '';
+        label += `(${s.account}, ${sign}$${s.amount})`;
+      }
+
+      pill.innerHTML = `<strong>S${s.stepIndex}:</strong> ${label}`;
+      sequenceStream.appendChild(pill);
+
+      if (idx < schedule.length - 1) {
+        const arrow = document.createElement('span');
+        arrow.className = 'seq-arrow';
+        arrow.textContent = '→';
+        sequenceStream.appendChild(arrow);
+      }
+    });
   }
 
   // ==========================================================================
@@ -209,15 +255,22 @@
 
   async function runSimulation(schedule) {
     try {
-      const resp = await fetch('/api/simulate', {
+      const payload = {
+        txCount: STATE.txCount,
+        schedule: schedule,
+        controlMode: 'NONE',
+        isolation: 'READ COMMITTED',
+      };
+
+      console.log('------------------------------------------------------------');
+      console.log('[goBankV2 Frontend] Dispathing Schedule to POST /simulate:');
+      console.log(JSON.stringify(payload, null, 2));
+      console.log('------------------------------------------------------------');
+
+      const resp = await fetch('/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          txCount: STATE.txCount,
-          schedule: schedule,
-          controlMode: 'NONE',
-          isolation: 'READ COMMITTED',
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!resp.ok) {
@@ -551,10 +604,12 @@
 
   function setTxCount(count) {
     STATE.txCount = count;
+    if (txCountSelect) txCountSelect.value = count;
     txCountButtons.forEach(b => {
       b.classList.toggle('active', parseInt(b.getAttribute('data-count'), 10) === count);
     });
     renderTimelines();
+    updateGlobalSequenceUI();
   }
 
   function setBlock(tx, step, op, account, amount = 0) {
@@ -567,6 +622,7 @@
         account: account,
         amount: amount,
       });
+      updateGlobalSequenceUI();
     }
   }
 

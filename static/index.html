@@ -67,6 +67,12 @@
       <!-- Concurrency Selector -->
       <div class="control-group">
         <label for="txCountSelect" class="control-label">Concurrent Transactions:</label>
+        <select id="txCountSelect" class="custom-select mini-select" style="width: 80px;">
+          <option value="1">1 Tx</option>
+          <option value="2" selected>2 Tx</option>
+          <option value="3">3 Tx</option>
+          <option value="4">4 Tx</option>
+        </select>
         <div class="tx-toggle-group" id="txCountGroup">
           <button type="button" class="tx-btn" data-count="1" id="txCountBtn1">1 Tx</button>
           <button type="button" class="tx-btn active" data-count="2" id="txCountBtn2">2 Tx</button>
@@ -218,6 +224,17 @@
           <div class="step-marker" data-step="6">Step 6</div>
           <div class="step-marker" data-step="7">Step 7</div>
           <div class="step-marker" data-step="8">Step 8</div>
+        </div>
+
+        <!-- Real-Time Global Schedule Sequence Tracker -->
+        <div class="global-sequence-container" id="globalSequenceContainer">
+          <div class="sequence-header">
+            <span class="sequence-title">Absolute Global Execution Order (Schedule <em>S</em>):</span>
+            <span class="sequence-count" id="sequenceCount">0 operations</span>
+          </div>
+          <div class="sequence-stream" id="sequenceStream">
+            <span class="sequence-empty">No operations placed — drag blocks into timelines above</span>
+          </div>
         </div>
       </section>
     </main>

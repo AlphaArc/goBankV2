@@ -114,16 +114,35 @@ window.DragDropModule = (function () {
     blockDiv.dataset.amount = blockData.amount || 0;
 
     let opLabel = blockData.op;
-    let detailText = '';
+    let bodyContent = '';
+
     if (blockData.op === 'READ') {
-      detailText = `Acc ${blockData.account}`;
+      bodyContent = `
+        <div class="block-input-row">
+          <span class="input-tag">Acc:</span>
+          <select class="inline-var-select inline-account-select">
+            <option value="A" ${blockData.account === 'A' ? 'selected' : ''}>A</option>
+            <option value="B" ${blockData.account === 'B' ? 'selected' : ''}>B</option>
+            <option value="C" ${blockData.account === 'C' ? 'selected' : ''}>C</option>
+          </select>
+        </div>
+      `;
     } else if (blockData.op === 'WRITE') {
-      const sign = (blockData.amount >= 0) ? '+' : '';
-      detailText = `Acc ${blockData.account} (${sign}$${blockData.amount})`;
+      bodyContent = `
+        <div class="block-input-row">
+          <span class="input-tag">Acc:</span>
+          <select class="inline-var-select inline-account-select">
+            <option value="A" ${blockData.account === 'A' ? 'selected' : ''}>A</option>
+            <option value="B" ${blockData.account === 'B' ? 'selected' : ''}>B</option>
+            <option value="C" ${blockData.account === 'C' ? 'selected' : ''}>C</option>
+          </select>
+          <input type="number" class="inline-var-input inline-amount-input" value="${blockData.amount || 200}" step="50" title="Amount delta">
+        </div>
+      `;
     } else if (blockData.op === 'COMMIT') {
-      detailText = 'Commit Tx';
+      bodyContent = '<div class="block-input-row"><span class="input-tag text-emerald">COMMIT</span></div>';
     } else if (blockData.op === 'ROLLBACK') {
-      detailText = 'Rollback';
+      bodyContent = '<div class="block-input-row"><span class="input-tag text-rose">ROLLBACK</span></div>';
     }
 
     blockDiv.innerHTML = `
@@ -131,9 +150,30 @@ window.DragDropModule = (function () {
         <span class="placed-type">${opLabel}</span>
         <button class="placed-remove" title="Remove">&times;</button>
       </div>
-      <div class="placed-body">${detailText}</div>
+      <div class="placed-body">${bodyContent}</div>
       <div class="placed-footer">Step ${blockData.stepIndex}</div>
     `;
+
+    // Listeners for inline account and amount variable changes
+    const accSelect = blockDiv.querySelector('.inline-account-select');
+    if (accSelect) {
+      accSelect.addEventListener('change', (e) => {
+        e.stopPropagation();
+        blockDiv.dataset.account = accSelect.value;
+        if (onScheduleChangeCallback) onScheduleChangeCallback();
+      });
+      accSelect.addEventListener('mousedown', (e) => e.stopPropagation());
+    }
+
+    const amtInput = blockDiv.querySelector('.inline-amount-input');
+    if (amtInput) {
+      amtInput.addEventListener('change', (e) => {
+        e.stopPropagation();
+        blockDiv.dataset.amount = parseFloat(amtInput.value) || 0;
+        if (onScheduleChangeCallback) onScheduleChangeCallback();
+      });
+      amtInput.addEventListener('mousedown', (e) => e.stopPropagation());
+    }
 
     // Remove button listener
     blockDiv.querySelector('.placed-remove').addEventListener('click', (e) => {
