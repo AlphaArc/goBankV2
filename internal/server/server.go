@@ -149,7 +149,7 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, result)
 }
 
-func (s *Server) handleFix(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleExecuteSafe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -157,21 +157,25 @@ func (s *Server) handleFix(w http.ResponseWriter, r *http.Request) {
 
 	var req models.SimulationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request payload"})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request payload: " + err.Error()})
 		return
 	}
 
-	// 1. Generate safe Strict 2PL schedule
+	// 1. Generate safe Strict 2PL schedule with lock/commit boundaries
 	safeSchedule, fixMsg := analyzer.GenerateSafeSchedule(req.Schedule)
 
-	// 2. Prepare fixed simulation request with Strict 2PL mode enabled
+	// 2. Prepare fixed simulation request with Strict 2PL mode enabled (SELECT ... FOR UPDATE)
 	fixedReq := req
 	fixedReq.Schedule = safeSchedule
 	fixedReq.ControlMode = models.ModeStrict2PL
+	fixedReq.Isolation = models.IsoSerializable
 
-	// 3. Execute safe simulation against MySQL
+	log.Printf("[EXECUTE-SAFE] Executing safe schedule with Strict 2PL on MySQL InnoDB (%d steps)...", len(safeSchedule))
+
+	// 3. Execute live simulation against MySQL database
 	result, err := s.db.ExecuteSimulation(fixedReq)
 	if err != nil {
+		log.Printf("[EXECUTE-SAFE] Simulation execution error: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
@@ -180,6 +184,7 @@ func (s *Server) handleFix(w http.ResponseWriter, r *http.Request) {
 	result.ResolutionMsg = fixMsg
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":        "resolved",
 		"fixedSchedule": safeSchedule,
 		"simulation":    result,
 		"fixMessage":    fixMsg,
