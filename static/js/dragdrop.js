@@ -4,6 +4,8 @@
 
 window.DragDropModule = (function () {
   let draggedData = null;
+  let draggedBlockElement = null;
+  let droppedInValidSlot = false;
   let onScheduleChangeCallback = null;
 
   function init(onScheduleChange) {
@@ -30,6 +32,8 @@ window.DragDropModule = (function () {
       account: (op === 'COMMIT' || op === 'ROLLBACK') ? 'ALL' : account,
       amount: op === 'WRITE' ? delta : 0,
     };
+    draggedBlockElement = null;
+    droppedInValidSlot = false;
 
     e.dataTransfer.setData('text/plain', JSON.stringify(draggedData));
     e.dataTransfer.effectAllowed = 'copy';
@@ -37,11 +41,29 @@ window.DragDropModule = (function () {
   }
 
   function handleDragEnd() {
-    this.classList.remove('dragging');
+    this.classList.remove('opacity-50', 'ring-2', 'ring-sky-400');
     document.querySelectorAll('.timeline-slot').forEach(slot => {
-      slot.classList.remove('drag-over');
+      slot.classList.remove('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
     });
+
+    // Out-of-bounds deletion: If a placed block was dropped outside valid slots
+    if (draggedData && !draggedData.isNew && !droppedInValidSlot && draggedBlockElement) {
+      const blockToDelete = draggedBlockElement;
+      // Tailwind fade-out transition classes
+      blockToDelete.classList.add('transition-opacity', 'duration-300', 'opacity-0', 'scale-75', '-translate-y-2');
+      setTimeout(() => {
+        if (blockToDelete.parentElement) {
+          blockToDelete.parentElement.innerHTML = '';
+        }
+        if (onScheduleChangeCallback) {
+          onScheduleChangeCallback();
+        }
+      }, 300);
+    }
+
     draggedData = null;
+    draggedBlockElement = null;
+    droppedInValidSlot = false;
   }
 
   function bindSlotEvents(slotElement) {
@@ -53,16 +75,17 @@ window.DragDropModule = (function () {
   function handleSlotDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    this.classList.add('drag-over');
+    this.classList.add('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
   }
 
   function handleSlotDragLeave() {
-    this.classList.remove('drag-over');
+    this.classList.remove('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
   }
 
   function handleSlotDrop(e) {
     e.preventDefault();
     this.classList.remove('drag-over');
+    droppedInValidSlot = true;
 
     let payload = draggedData;
     if (!payload) {
@@ -105,7 +128,6 @@ window.DragDropModule = (function () {
     slotElement.innerHTML = ''; // Replace any existing block
 
     const blockDiv = document.createElement('div');
-    blockDiv.className = `placed-block op-${blockData.op}`;
     blockDiv.setAttribute('draggable', 'true');
     blockDiv.dataset.tx = blockData.txId;
     blockDiv.dataset.step = blockData.stepIndex;
@@ -113,14 +135,27 @@ window.DragDropModule = (function () {
     blockDiv.dataset.account = blockData.account;
     blockDiv.dataset.amount = blockData.amount || 0;
 
-    let opLabel = blockData.op;
-    let bodyContent = '';
+    let opStyles = 'bg-sky-500/15 border-sky-500/40 text-sky-100';
+    let opBadgeColor = 'text-sky-400';
+    if (blockData.op === 'WRITE') {
+      opStyles = 'bg-purple-500/15 border-purple-500/40 text-purple-100';
+      opBadgeColor = 'text-purple-400';
+    } else if (blockData.op === 'COMMIT') {
+      opStyles = 'bg-emerald-500/15 border-emerald-500/40 text-emerald-100';
+      opBadgeColor = 'text-emerald-400';
+    } else if (blockData.op === 'ROLLBACK') {
+      opStyles = 'bg-rose-500/15 border-rose-500/40 text-rose-100';
+      opBadgeColor = 'text-rose-400';
+    }
 
+    blockDiv.className = `placed-block relative w-full h-full p-2 rounded-lg flex flex-col justify-between cursor-grab active:cursor-grabbing select-none border transition-all duration-200 shadow-sm ${opStyles}`;
+
+    let bodyContent = '';
     if (blockData.op === 'READ') {
       bodyContent = `
-        <div class="block-input-row">
-          <span class="input-tag">Acc:</span>
-          <select class="inline-var-select inline-account-select">
+        <div class="flex items-center gap-1 text-[11px] font-mono">
+          <span class="text-slate-400">Acc:</span>
+          <select class="inline-account-select bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 focus:outline-none focus:border-sky-500">
             <option value="A" ${blockData.account === 'A' ? 'selected' : ''}>A</option>
             <option value="B" ${blockData.account === 'B' ? 'selected' : ''}>B</option>
             <option value="C" ${blockData.account === 'C' ? 'selected' : ''}>C</option>
@@ -129,29 +164,28 @@ window.DragDropModule = (function () {
       `;
     } else if (blockData.op === 'WRITE') {
       bodyContent = `
-        <div class="block-input-row">
-          <span class="input-tag">Acc:</span>
-          <select class="inline-var-select inline-account-select">
+        <div class="flex items-center gap-1 text-[11px] font-mono">
+          <select class="inline-account-select bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 focus:outline-none focus:border-purple-500">
             <option value="A" ${blockData.account === 'A' ? 'selected' : ''}>A</option>
             <option value="B" ${blockData.account === 'B' ? 'selected' : ''}>B</option>
             <option value="C" ${blockData.account === 'C' ? 'selected' : ''}>C</option>
           </select>
-          <input type="number" class="inline-var-input inline-amount-input" value="${blockData.amount || 200}" step="50" title="Amount delta">
+          <input type="number" class="inline-amount-input w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-slate-200 text-right focus:outline-none focus:border-purple-500" value="${blockData.amount || 200}" step="50" title="Amount delta">
         </div>
       `;
     } else if (blockData.op === 'COMMIT') {
-      bodyContent = '<div class="block-input-row"><span class="input-tag text-emerald">COMMIT</span></div>';
+      bodyContent = '<div class="text-[11px] font-mono font-bold text-emerald-400 text-center py-0.5">COMMIT</div>';
     } else if (blockData.op === 'ROLLBACK') {
-      bodyContent = '<div class="block-input-row"><span class="input-tag text-rose">ROLLBACK</span></div>';
+      bodyContent = '<div class="text-[11px] font-mono font-bold text-rose-400 text-center py-0.5">ROLLBACK</div>';
     }
 
     blockDiv.innerHTML = `
-      <div class="placed-header">
-        <span class="placed-type">${opLabel}</span>
-        <button class="placed-remove" title="Remove">&times;</button>
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-mono font-bold ${opBadgeColor}">${blockData.op}</span>
+        <button type="button" class="placed-remove text-slate-400 hover:text-rose-400 font-bold text-sm leading-none transition" title="Remove">&times;</button>
       </div>
-      <div class="placed-body">${bodyContent}</div>
-      <div class="placed-footer">Step ${blockData.stepIndex}</div>
+      <div class="my-1">${bodyContent}</div>
+      <div class="text-[10px] font-mono text-slate-400 text-right">Step ${blockData.stepIndex}</div>
     `;
 
     // Listeners for inline account and amount variable changes
@@ -192,6 +226,8 @@ window.DragDropModule = (function () {
         account: blockData.account,
         amount: blockData.amount,
       };
+      draggedBlockElement = blockDiv;
+      droppedInValidSlot = false;
       e.dataTransfer.setData('text/plain', JSON.stringify(draggedData));
       e.dataTransfer.effectAllowed = 'move';
       blockDiv.classList.add('dragging');

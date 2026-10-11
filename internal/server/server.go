@@ -126,9 +126,13 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validation
+	// Validation: inherently supports variable array lengths with defensive upper boundary
 	if len(req.Schedule) == 0 {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Validation failed: schedule cannot be empty"})
+		return
+	}
+	if len(req.Schedule) > 200 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Validation failed: schedule exceeds maximum allowed steps (200)"})
 		return
 	}
 
@@ -160,6 +164,14 @@ func (s *Server) handleExecuteSafe(w http.ResponseWriter, r *http.Request) {
 	var req models.SimulationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request payload: " + err.Error()})
+		return
+	}
+	if len(req.Schedule) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Validation failed: schedule cannot be empty"})
+		return
+	}
+	if len(req.Schedule) > 200 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Validation failed: schedule exceeds maximum allowed steps (200)"})
 		return
 	}
 

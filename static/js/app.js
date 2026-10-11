@@ -115,35 +115,104 @@
   // Timelines Rendering
   // ==========================================================================
 
+  function createSlotElement(txId, step) {
+    const slot = document.createElement('div');
+    slot.className = 'timeline-slot relative flex-shrink-0 w-28 min-h-[76px] rounded-xl border-2 border-dashed border-slate-700/80 bg-slate-900/80 flex items-center justify-center transition-all duration-200 snap-start hover:border-sky-500/50';
+    slot.dataset.tx = txId;
+    slot.dataset.step = step;
+    slot.innerHTML = `<span class="absolute top-1 right-2 font-mono text-[10px] text-slate-500 select-none">${step}</span>`;
+    window.DragDropModule.bindSlotEvents(slot);
+    return slot;
+  }
+
   function renderTimelines() {
     timelinesList.innerHTML = '';
     const txNames = ['T1', 'T2', 'T3', 'T4'];
 
+    const txBadges = {
+      T1: 'border-sky-500/40 bg-sky-500/10 text-sky-400',
+      T2: 'border-purple-500/40 bg-purple-500/10 text-purple-400',
+      T3: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+      T4: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
+    };
+
     for (let i = 0; i < STATE.txCount; i++) {
       const txId = txNames[i];
-      const row = document.createElement('div');
-      row.className = 'tx-row';
-      row.dataset.tx = txId;
+      const card = document.createElement('div');
+      card.className = 'tx-row bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 shadow-lg hover:border-slate-700/80 transition-all';
+      card.dataset.tx = txId;
 
-      row.innerHTML = `
-        <div class="tx-meta">
-          <div class="tx-badge">${txId}</div>
-          <span class="tx-state-tag">Idle</span>
+      card.innerHTML = `
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold border ${txBadges[txId]}">${txId}</span>
+            <span class="text-xs font-mono text-slate-500 tx-state-tag">Idle</span>
+          </div>
+          <button type="button" class="btn-add-step inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-sky-500/40 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 text-xs font-mono font-semibold transition" data-tx="${txId}" title="Add step to ${txId}">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>+ Step</span>
+          </button>
         </div>
-        <div class="tx-slots-track" id="track_${txId}"></div>
+        <div class="overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 custom-scrollbar" id="scroll_${txId}">
+          <div class="flex items-stretch gap-2.5 min-w-max" id="track_${txId}"></div>
+        </div>
       `;
 
-      const track = row.querySelector(`#track_${txId}`);
+      const track = card.querySelector(`#track_${txId}`);
       for (let step = 1; step <= 8; step++) {
-        const slot = document.createElement('div');
-        slot.className = 'timeline-slot';
-        slot.dataset.tx = txId;
-        slot.dataset.step = step;
-        window.DragDropModule.bindSlotEvents(slot);
+        const slot = createSlotElement(txId, step);
         track.appendChild(slot);
       }
 
-      timelinesList.appendChild(row);
+      const addStepBtn = card.querySelector('.btn-add-step');
+      addStepBtn.addEventListener('click', () => {
+        addStepToTimeline(txId);
+      });
+
+      timelinesList.appendChild(card);
+    }
+
+    updateGlobalStepBar();
+  }
+
+  function addStepToTimeline(txId) {
+    const track = document.getElementById(`track_${txId}`);
+    const scrollWrapper = document.getElementById(`scroll_${txId}`);
+    if (!track) return;
+
+    const currentSlots = track.querySelectorAll('.timeline-slot');
+    const nextStep = currentSlots.length + 1;
+
+    const slot = createSlotElement(txId, nextStep);
+    track.appendChild(slot);
+
+    updateGlobalStepBar();
+
+    if (scrollWrapper) {
+      scrollWrapper.scrollTo({ left: scrollWrapper.scrollWidth, behavior: 'smooth' });
+    }
+  }
+
+  function updateGlobalStepBar() {
+    const globalStepBar = document.getElementById('globalStepBar');
+    if (!globalStepBar) return;
+
+    let maxStep = 8;
+    document.querySelectorAll('.tx-slots-track, [id^="track_"]').forEach(track => {
+      const count = track.querySelectorAll('.timeline-slot').length;
+      if (count > maxStep) maxStep = count;
+    });
+
+    globalStepBar.innerHTML = '';
+    for (let step = 1; step <= maxStep; step++) {
+      const marker = document.createElement('div');
+      marker.className = 'step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800';
+      marker.dataset.step = step;
+      marker.textContent = `Step ${step}`;
+      globalStepBar.appendChild(marker);
     }
   }
 
@@ -172,7 +241,12 @@
     sequenceStream.innerHTML = '';
     schedule.forEach((s, idx) => {
       const pill = document.createElement('div');
-      pill.className = `seq-pill op-${s.op}`;
+      let pillColors = 'bg-sky-500/15 text-sky-300 border-sky-500/40';
+      if (s.op === 'WRITE') pillColors = 'bg-purple-500/15 text-purple-300 border-purple-500/40';
+      else if (s.op === 'COMMIT') pillColors = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40';
+      else if (s.op === 'ROLLBACK') pillColors = 'bg-rose-500/15 text-rose-300 border-rose-500/40';
+
+      pill.className = `seq-pill inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold border ${pillColors}`;
 
       let label = `${s.txId}.${s.op}`;
       if (s.op === 'READ') {
@@ -182,12 +256,12 @@
         label += `(${s.account}, ${sign}$${s.amount})`;
       }
 
-      pill.innerHTML = `<strong>S${s.stepIndex}:</strong> ${label}`;
+      pill.innerHTML = `<span class="opacity-75">S${s.stepIndex}:</span> ${label}`;
       sequenceStream.appendChild(pill);
 
       if (idx < schedule.length - 1) {
         const arrow = document.createElement('span');
-        arrow.className = 'seq-arrow';
+        arrow.className = 'text-slate-600 text-xs font-bold';
         arrow.textContent = '→';
         sequenceStream.appendChild(arrow);
       }
@@ -200,28 +274,30 @@
 
   function resetToSimulateState() {
     STATE.mode = 'SIMULATE';
-    btnMainAction.className = 'btn-primary-action simulate-state';
+    btnMainAction.className = 'btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-sky-500 hover:bg-sky-400 shadow-lg shadow-sky-500/25 transition-all';
     actionButtonText.textContent = 'Simulate Schedule';
     actionIcon.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <polygon points="5 3 19 12 5 21 5 3"></polygon>
       </svg>
     `;
-    statusDot.className = 'status-indicator-dot';
-    serializableBadge.className = 'badge-status';
+    statusDot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+    serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
     serializableBadge.textContent = 'Ready';
   }
 
   function transformToFixState() {
     STATE.mode = 'FIX';
-    btnMainAction.className = 'btn-primary-action fix-state';
+    btnMainAction.className = 'btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-500/30 transition-all animate-pulse';
     actionButtonText.textContent = 'Fix Problem (Apply Strict 2PL)';
     actionIcon.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
       </svg>
     `;
-    statusDot.className = 'status-indicator-dot dot-hazard';
+    statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
+    serializableBadge.className = 'badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40';
+    serializableBadge.textContent = 'Non-Serializable Hazard';
   }
 
   // ==========================================================================
@@ -770,7 +846,20 @@
   }
 
   function setBlock(tx, step, op, account, amount = 0) {
-    const slot = document.querySelector(`.timeline-slot[data-tx="${tx}"][data-step="${step}"]`);
+    let slot = document.querySelector(`.timeline-slot[data-tx="${tx}"][data-step="${step}"]`);
+    if (!slot) {
+      const track = document.getElementById(`track_${tx}`);
+      if (track) {
+        let currentCount = track.querySelectorAll('.timeline-slot').length;
+        while (currentCount < step) {
+          currentCount++;
+          const newSlot = createSlotElement(tx, currentCount);
+          track.appendChild(newSlot);
+        }
+        updateGlobalStepBar();
+        slot = document.querySelector(`.timeline-slot[data-tx="${tx}"][data-step="${step}"]`);
+      }
+    }
     if (slot) {
       window.DragDropModule.placeBlockInSlot(slot, {
         txId: tx,
@@ -786,10 +875,7 @@
   function populateTimelineFromSchedule(schedule) {
     clearAllSlots();
     schedule.forEach(s => {
-      // Slot steps are 1..8
-      if (s.stepIndex <= 8) {
-        setBlock(s.txId, s.stepIndex, s.op, s.account, s.amount);
-      }
+      setBlock(s.txId, s.stepIndex, s.op, s.account, s.amount);
     });
   }
 

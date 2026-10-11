@@ -649,9 +649,9 @@ body {
 /* Individual Transaction Row */
 .tx-row {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 130px 1fr auto;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -706,16 +706,52 @@ body {
   color: var(--text-dim);
 }
 
+/* Horizontal Scrollable Container for Dynamic Steps */
+.tx-slots-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 8px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.4) rgba(15, 23, 42, 0.6);
+}
+
+.tx-slots-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tx-slots-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 999px;
+}
+
+.tx-slots-scroll::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.35);
+  border-radius: 999px;
+}
+
+.tx-slots-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.7);
+}
+
 /* Step Slots Track */
 .tx-slots-track {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 10px;
+  min-width: min-content;
 }
 
 /* Single Slot */
 .timeline-slot {
-  min-height: 72px;
+  flex: 0 0 110px;
+  min-width: 110px;
+  min-height: 74px;
+  scroll-snap-align: start;
   background: var(--bg-slot);
   border: 1.5px dashed var(--border-subtle);
   border-radius: var(--radius-md);
@@ -744,6 +780,38 @@ body {
   transform: scale(1.02);
 }
 
+/* Add Step Button */
+.btn-add-step {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1.5px dashed rgba(56, 189, 248, 0.4);
+  color: var(--accent-blue);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.btn-add-step:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--accent-blue);
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+}
+
+.btn-add-step svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+
 /* Dropped Block inside a Slot */
 .placed-block {
   width: 100%;
@@ -762,6 +830,14 @@ body {
 @keyframes drop-appear {
   0% { transform: scale(0.85); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* Out of bounds deletion transition */
+.placed-block.fade-out-delete {
+  opacity: 0 !important;
+  transform: scale(0.65) translateY(-8px) !important;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  pointer-events: none;
 }
 
 .placed-block .placed-header {
@@ -829,14 +905,28 @@ body {
 .placed-block.op-ROLLBACK .placed-type { color: var(--accent-rose); }
 
 /* Global Timeline Step Markers */
+.global-timeline-bar-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-left: 144px;
+  margin-right: 110px;
+  scrollbar-width: none;
+}
+
+.global-timeline-bar-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
 .global-timeline-bar {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  display: flex;
+  flex-direction: row;
   gap: 10px;
-  margin-left: 156px; /* align with tx-slots-track */
+  min-width: min-content;
 }
 
 .step-marker {
+  flex: 0 0 110px;
+  min-width: 110px;
   text-align: center;
   font-family: var(--font-mono);
   font-size: 0.72rem;

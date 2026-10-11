@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.2.0] - 2026-10-12
+
+### Added
+- **Phase 8: Offline Tailwind CSS Architecture**:
+  - **100% Offline Standalone Tailwind CLI Setup**: Configured local compiling pipeline (`tailwind.config.js` and `static/css/input.css` -> `static/css/output.css`) eliminating external CDN dependencies.
+  - **Fully Refactored Responsive HTML UI**: Migrated `index.html` to utility classes with responsive grid layouts (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4`) for timeline cards.
+  - **Tailwind Horizontal Sliders & Snap**: Styled timeline step tracks with `overflow-x-auto scroll-smooth snap-x snap-mandatory` and custom scrollbars.
+  - **Fade-Out Transition Deletion**: Integrated Tailwind transition utilities (`transition-opacity duration-300 opacity-0 scale-75 -translate-y-2`) for out-of-bounds drops.
+  - **Go Static Asset Verification**: Validated `http.FileServer` serving of `output.css` via local loopback.
+
+---
+
+## [1.1.0] - 2026-10-12
+
+### Added
+- **Phase 7: Advanced UI Refactoring & Dynamic Steps**:
+  - **Dynamic Step Addition (`+ Add Step`)**: Added dynamic step button at the end of every timeline (T1..T4), appending empty drop-zone slots on demand with automatic Step $N+1$ numbering.
+  - **Smooth Horizontal Slider & CSS Scroll Snapping**: Implemented `overflow-x: auto`, `scroll-behavior: smooth`, and `scroll-snap-type: x mandatory` with slim neon-themed scrollbars for T1..T4 containers to prevent layout breakage on long schedules.
+  - **Out-of-Bounds Drag Deletion**: Dragging a placed operation block out of any valid timeline drop-zone triggers an animated fade-out transition, deletes the block from the DOM, and immediately updates global sequence tracking.
+  - **Dynamic Timeline Bar Synchronization**: Global step marker bar dynamically scales to match the longest timeline track and scrolls smoothly.
+  - **Backend Payload Validation**: Verified and fortified `SimulationRequest` handling in Go to safely handle variable-length step slices with defensive size validation.
+
+---
+
 ## [1.0.0] - 2026-10-12
 
 ### Added

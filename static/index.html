@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,19 +8,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <!-- Local Offline Tailwind Compiled Stylesheet -->
+  <link rel="stylesheet" href="css/output.css">
 </head>
-<body class="dark-theme">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-sky-500 selection:text-white relative overflow-x-hidden">
   <!-- Background Glow Accents -->
-  <div class="bg-glow bg-glow-1"></div>
-  <div class="bg-glow bg-glow-2"></div>
-  <div class="bg-glow bg-glow-3"></div>
+  <div class="fixed -top-40 -left-40 w-96 h-96 rounded-full bg-sky-500/10 blur-[130px] pointer-events-none"></div>
+  <div class="fixed top-1/3 -right-40 w-96 h-96 rounded-full bg-purple-500/10 blur-[150px] pointer-events-none"></div>
+  <div class="fixed -bottom-40 left-1/3 w-96 h-96 rounded-full bg-emerald-500/10 blur-[140px] pointer-events-none"></div>
 
-  <div class="app-layout">
+  <div class="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col gap-6 relative z-10">
     <!-- Header -->
-    <header class="app-header">
-      <div class="header-brand">
-        <div class="logo-icon">
+    <header class="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl shadow-2xl">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
             <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
@@ -28,30 +29,46 @@
           </svg>
         </div>
         <div>
-          <h1 class="brand-title">goBank <span class="gradient-badge">V2 SIMULATOR</span></h1>
-          <p class="brand-subtitle">DBMS Serialization Hazards & Concurrency Control Visualizer</p>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-white">goBank</h1>
+            <span class="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/30 uppercase tracking-wider">V2 Simulator</span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-400">DBMS Serialization Hazards & Concurrency Control Visualizer</p>
         </div>
       </div>
 
       <!-- Live Bank Accounts Overview -->
-      <div class="header-accounts" id="accountsOverview">
-        <div class="account-card" id="cardAccountA">
-          <span class="acc-badge">Account A</span>
-          <span class="acc-owner">Alice Springs</span>
-          <span class="acc-balance" id="balAccountA">$1,000.00</span>
+      <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto" id="accountsOverview">
+        <!-- Account A -->
+        <div class="flex-1 sm:flex-initial flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-800" id="cardAccountA">
+          <div class="flex flex-col">
+            <span class="text-[10px] font-mono uppercase text-sky-400 font-semibold">Account A</span>
+            <span class="text-xs text-slate-400">Alice Springs</span>
+          </div>
+          <span class="font-mono text-sm sm:text-base font-bold text-slate-100 ml-auto" id="balAccountA">$1,000.00</span>
         </div>
-        <div class="account-card" id="cardAccountB">
-          <span class="acc-badge">Account B</span>
-          <span class="acc-owner">Bob Vance</span>
-          <span class="acc-balance" id="balAccountB">$1,000.00</span>
+
+        <!-- Account B -->
+        <div class="flex-1 sm:flex-initial flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-800" id="cardAccountB">
+          <div class="flex flex-col">
+            <span class="text-[10px] font-mono uppercase text-purple-400 font-semibold">Account B</span>
+            <span class="text-xs text-slate-400">Bob Vance</span>
+          </div>
+          <span class="font-mono text-sm sm:text-base font-bold text-slate-100 ml-auto" id="balAccountB">$1,000.00</span>
         </div>
-        <div class="account-card" id="cardAccountC">
-          <span class="acc-badge">Account C</span>
-          <span class="acc-owner">Charlie Day</span>
-          <span class="acc-balance" id="balAccountC">$1,000.00</span>
+
+        <!-- Account C -->
+        <div class="flex-1 sm:flex-initial flex items-center gap-3 px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-800" id="cardAccountC">
+          <div class="flex flex-col">
+            <span class="text-[10px] font-mono uppercase text-emerald-400 font-semibold">Account C</span>
+            <span class="text-xs text-slate-400">Charlie Day</span>
+          </div>
+          <span class="font-mono text-sm sm:text-base font-bold text-slate-100 ml-auto" id="balAccountC">$1,000.00</span>
         </div>
-        <button id="btnResetDB" class="btn-icon" title="Reset All Balances to $1,000">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+        <!-- Reset DB Button -->
+        <button id="btnResetDB" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition text-xs font-medium" title="Reset All Balances to $1,000">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 2v6h-6"></path>
             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
             <path d="M3 22v-6h6"></path>
@@ -63,29 +80,29 @@
     </header>
 
     <!-- Controls Bar -->
-    <section class="controls-bar">
+    <section class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-lg flex flex-wrap items-center justify-between gap-4">
       <!-- Concurrency Selector -->
-      <div class="control-group">
-        <label for="txCountSelect" class="control-label">Concurrent Transactions:</label>
-        <select id="txCountSelect" class="custom-select mini-select" style="width: 80px;">
+      <div class="flex items-center gap-3">
+        <label for="txCountSelect" class="text-xs sm:text-sm font-medium text-slate-300">Concurrent Transactions:</label>
+        <select id="txCountSelect" class="sm:hidden bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none">
           <option value="1">1 Tx</option>
           <option value="2" selected>2 Tx</option>
           <option value="3">3 Tx</option>
           <option value="4">4 Tx</option>
         </select>
-        <div class="tx-toggle-group" id="txCountGroup">
-          <button type="button" class="tx-btn" data-count="1" id="txCountBtn1">1 Tx</button>
-          <button type="button" class="tx-btn active" data-count="2" id="txCountBtn2">2 Tx</button>
-          <button type="button" class="tx-btn" data-count="3" id="txCountBtn3">3 Tx</button>
-          <button type="button" class="tx-btn" data-count="4" id="txCountBtn4">4 Tx</button>
+        <div class="hidden sm:inline-flex p-1 rounded-xl bg-slate-950/80 border border-slate-800 gap-1" id="txCountGroup">
+          <button type="button" class="tx-btn px-3 py-1 text-xs font-mono font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition" data-count="1" id="txCountBtn1">1 Tx</button>
+          <button type="button" class="tx-btn active px-3 py-1 text-xs font-mono font-semibold rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-sm" data-count="2" id="txCountBtn2">2 Tx</button>
+          <button type="button" class="tx-btn px-3 py-1 text-xs font-mono font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition" data-count="3" id="txCountBtn3">3 Tx</button>
+          <button type="button" class="tx-btn px-3 py-1 text-xs font-mono font-semibold rounded-lg text-slate-400 hover:text-slate-200 transition" data-count="4" id="txCountBtn4">4 Tx</button>
         </div>
       </div>
 
       <!-- Presets / Quick Scenarios -->
-      <div class="control-group">
-        <label class="control-label">Educational Scenarios:</label>
-        <div class="preset-dropdown-wrap">
-          <select id="presetScenarioSelect" class="custom-select">
+      <div class="flex items-center gap-2.5 flex-1 min-w-[280px] max-w-xl">
+        <label class="text-xs sm:text-sm font-medium text-slate-300 whitespace-nowrap">Scenarios:</label>
+        <div class="flex items-center gap-2 w-full">
+          <select id="presetScenarioSelect" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 font-sans focus:ring-2 focus:ring-sky-500 focus:outline-none">
             <option value="">-- Load Scenario Preset --</option>
             <optgroup label="1 Transaction (Single Lifecycle)">
               <option value="tx1_atomic_transfer">1 Tx: Atomic Account Transfer (A → B)</option>
@@ -110,18 +127,19 @@
               <option value="tx4_safe_settlement">4 Tx: Concurrent Batch Settlement (Safe)</option>
             </optgroup>
           </select>
-          <button id="btnLoadPreset" class="btn-secondary">Load</button>
+          <button id="btnLoadPreset" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition" type="button">Load</button>
         </div>
       </div>
 
       <!-- Action Buttons -->
-      <div class="control-group actions-wrap">
-        <button id="btnClearTimeline" class="btn-ghost" title="Clear all blocks">Clear</button>
+      <div class="flex items-center gap-2.5">
+        <button id="btnClearTimeline" type="button" class="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-xs font-medium transition" title="Clear all blocks">Clear</button>
+        
         <!-- Dynamic Simulate / Fix Button -->
-        <button id="btnMainAction" class="btn-primary-action simulate-state">
-          <span class="btn-spinner hidden" id="actionSpinner"></span>
+        <button id="btnMainAction" type="button" class="btn-primary-action inline-flex items-center gap-2 px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm text-white bg-sky-500 hover:bg-sky-400 shadow-lg shadow-sky-500/25 transition-all">
+          <span class="btn-spinner hidden w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" id="actionSpinner"></span>
           <span class="btn-icon-span" id="actionIcon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
           </span>
@@ -131,26 +149,26 @@
     </section>
 
     <!-- Main Workspace: Palette & Timelines -->
-    <main class="workspace-grid">
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <!-- Left Column: Operations Toolbox (Drag Palette) -->
-      <aside class="palette-panel">
-        <div class="panel-header">
-          <h2>Operation Blocks</h2>
-          <span class="panel-hint">Drag into timeline slots</span>
+      <aside class="lg:col-span-3 xl:col-span-3 flex flex-col gap-4 p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-lg shadow-xl">
+        <div class="border-b border-slate-800 pb-3">
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Operation Blocks</h2>
+          <span class="text-xs text-slate-400">Drag into transaction slots</span>
         </div>
 
-        <div class="palette-config">
-          <div class="config-row">
-            <label for="paletteAccount" class="sub-label">Target Account:</label>
-            <select id="paletteAccount" class="custom-select mini-select">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-2">
+            <label for="paletteAccount" class="text-xs text-slate-300 font-medium">Target Account:</label>
+            <select id="paletteAccount" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1 font-mono focus:ring-1 focus:ring-sky-500">
               <option value="A">Account A ($1000)</option>
               <option value="B">Account B ($1000)</option>
               <option value="C">Account C ($1000)</option>
             </select>
           </div>
-          <div class="config-row">
-            <label for="paletteDelta" class="sub-label">Write Amount:</label>
-            <select id="paletteDelta" class="custom-select mini-select">
+          <div class="flex items-center justify-between gap-2">
+            <label for="paletteDelta" class="text-xs text-slate-300 font-medium">Write Amount:</label>
+            <select id="paletteDelta" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1 font-mono focus:ring-1 focus:ring-sky-500">
               <option value="200">+$200 (Deposit)</option>
               <option value="-200">-$200 (Withdraw)</option>
               <option value="500">+$500 (Deposit)</option>
@@ -159,154 +177,159 @@
           </div>
         </div>
 
-        <div class="draggable-palette" id="blockPalette">
+        <div class="flex flex-col gap-2.5 pt-2" id="blockPalette">
           <!-- Read Block -->
-          <div class="palette-block block-read" draggable="true" data-op="READ" id="sourceBlockRead">
-            <div class="block-icon">R</div>
-            <div class="block-info">
-              <span class="block-name">Read Balance</span>
-              <span class="block-meta">SELECT balance</span>
+          <div class="palette-block flex items-center justify-between p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 hover:border-sky-500/60 cursor-grab active:cursor-grabbing transition group select-none" draggable="true" data-op="READ" id="sourceBlockRead">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 font-mono font-bold flex items-center justify-center text-sm">R</div>
+              <div>
+                <div class="text-xs font-semibold text-slate-100">Read Balance</div>
+                <div class="text-[10px] font-mono text-sky-400/80">SELECT balance</div>
+              </div>
             </div>
-            <div class="drag-handle">⋮⋮</div>
+            <span class="text-slate-500 group-hover:text-slate-300 text-xs font-mono">⋮⋮</span>
           </div>
 
           <!-- Write Block -->
-          <div class="palette-block block-write" draggable="true" data-op="WRITE" id="sourceBlockWrite">
-            <div class="block-icon">W</div>
-            <div class="block-info">
-              <span class="block-name">Write / Update</span>
-              <span class="block-meta">UPDATE balance</span>
+          <div class="palette-block flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 hover:border-purple-500/60 cursor-grab active:cursor-grabbing transition group select-none" draggable="true" data-op="WRITE" id="sourceBlockWrite">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 font-mono font-bold flex items-center justify-center text-sm">W</div>
+              <div>
+                <div class="text-xs font-semibold text-slate-100">Write / Update</div>
+                <div class="text-[10px] font-mono text-purple-400/80">UPDATE balance</div>
+              </div>
             </div>
-            <div class="drag-handle">⋮⋮</div>
+            <span class="text-slate-500 group-hover:text-slate-300 text-xs font-mono">⋮⋮</span>
           </div>
 
           <!-- Commit Block -->
-          <div class="palette-block block-commit" draggable="true" data-op="COMMIT" id="sourceBlockCommit">
-            <div class="block-icon">C</div>
-            <div class="block-info">
-              <span class="block-name">Commit Tx</span>
-              <span class="block-meta">COMMIT & Release</span>
+          <div class="palette-block flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-500/60 cursor-grab active:cursor-grabbing transition group select-none" draggable="true" data-op="COMMIT" id="sourceBlockCommit">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 font-mono font-bold flex items-center justify-center text-sm">C</div>
+              <div>
+                <div class="text-xs font-semibold text-slate-100">Commit Tx</div>
+                <div class="text-[10px] font-mono text-emerald-400/80">COMMIT & Release</div>
+              </div>
             </div>
-            <div class="drag-handle">⋮⋮</div>
+            <span class="text-slate-500 group-hover:text-slate-300 text-xs font-mono">⋮⋮</span>
           </div>
 
           <!-- Rollback Block -->
-          <div class="palette-block block-rollback" draggable="true" data-op="ROLLBACK" id="sourceBlockRollback">
-            <div class="block-icon">AB</div>
-            <div class="block-info">
-              <span class="block-name">Abort / Rollback</span>
-              <span class="block-meta">ROLLBACK changes</span>
+          <div class="palette-block flex items-center justify-between p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:border-rose-500/60 cursor-grab active:cursor-grabbing transition group select-none" draggable="true" data-op="ROLLBACK" id="sourceBlockRollback">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 font-mono font-bold flex items-center justify-center text-sm">AB</div>
+              <div>
+                <div class="text-xs font-semibold text-slate-100">Abort / Rollback</div>
+                <div class="text-[10px] font-mono text-rose-400/80">ROLLBACK changes</div>
+              </div>
             </div>
-            <div class="drag-handle">⋮⋮</div>
+            <span class="text-slate-500 group-hover:text-slate-300 text-xs font-mono">⋮⋮</span>
           </div>
         </div>
 
-        <div class="palette-instructions">
-          <h3>Interactive Guide</h3>
-          <ul>
-            <li><strong>Global Execution Order:</strong> Time flows from left to right across all transaction timelines.</li>
-            <li><strong>Step Numbering:</strong> Slots determine the exact interleaved sequence sent to MySQL.</li>
-            <li><strong>Conflicts:</strong> Interleaving Reads and Writes on the same account triggers hazard warnings.</li>
-          </ul>
+        <div class="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex flex-col gap-1.5 mt-2">
+          <strong class="text-slate-300">Quick Guide:</strong>
+          <p>• Drag blocks into timeline slots across T1 through T4.</p>
+          <p>• Click <strong>+ Add Step</strong> to dynamically append slots.</p>
+          <p>• Drag any block outside timelines to delete with fade-out.</p>
         </div>
       </aside>
 
       <!-- Center Column: Multi-Transaction Timelines -->
-      <section class="timeline-container">
-        <div class="timeline-header">
-          <div class="timeline-title-wrap">
-            <h2>Concurrent Timelines</h2>
-            <p class="timeline-subtitle">Time order increases from Step 1 through Step 8</p>
+      <section class="lg:col-span-9 xl:col-span-9 flex flex-col gap-4 p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-lg shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-white tracking-wide">Concurrent Timelines</h2>
+            <p class="text-xs text-slate-400">Horizontal order represents temporal interleaved sequence</p>
           </div>
-          <div class="time-axis-indicator">
+          <div class="flex items-center gap-2 text-xs font-mono text-sky-400 bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/30">
             <span>START (T0)</span>
-            <div class="axis-arrow"></div>
+            <span>&rarr;</span>
             <span>EXECUTION ORDER &rarr;</span>
           </div>
         </div>
 
-        <!-- Dynamic Timelines Area -->
-        <div class="timelines-list" id="timelinesList">
-          <!-- Timelines for T1..T4 injected by app.js -->
+        <!-- Dynamic Timelines Area (Responsive Grid: 1 col on mobile, up to 4 cols side-by-side or stacked) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="timelinesList">
+          <!-- Timelines for T1..T4 dynamically injected by app.js -->
         </div>
 
-        <!-- Live Step Bar Indicator -->
-        <div class="global-timeline-bar" id="globalStepBar">
-          <div class="step-marker" data-step="1">Step 1</div>
-          <div class="step-marker" data-step="2">Step 2</div>
-          <div class="step-marker" data-step="3">Step 3</div>
-          <div class="step-marker" data-step="4">Step 4</div>
-          <div class="step-marker" data-step="5">Step 5</div>
-          <div class="step-marker" data-step="6">Step 6</div>
-          <div class="step-marker" data-step="7">Step 7</div>
-          <div class="step-marker" data-step="8">Step 8</div>
+        <!-- Live Step Bar Indicator (Scrollable Wrapper) -->
+        <div class="global-timeline-bar-wrapper overflow-x-auto scroll-smooth custom-scrollbar pt-2" id="globalStepBarWrapper">
+          <div class="global-timeline-bar flex items-center gap-2.5 min-w-max" id="globalStepBar">
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="1">Step 1</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="2">Step 2</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="3">Step 3</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="4">Step 4</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="5">Step 5</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="6">Step 6</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="7">Step 7</div>
+            <div class="step-marker flex-shrink-0 w-28 text-center font-mono text-xs text-slate-400 py-1 border-t border-slate-800" data-step="8">Step 8</div>
+          </div>
         </div>
 
         <!-- Real-Time Global Schedule Sequence Tracker -->
-        <div class="global-sequence-container" id="globalSequenceContainer">
-          <div class="sequence-header">
-            <span class="sequence-title">Absolute Global Execution Order (Schedule <em>S</em>):</span>
-            <span class="sequence-count" id="sequenceCount">0 operations</span>
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col gap-2 mt-2" id="globalSequenceContainer">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300">Absolute Global Execution Order (Schedule <em>S</em>):</span>
+            <span class="text-[11px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800" id="sequenceCount">0 operations</span>
           </div>
-          <div class="sequence-stream" id="sequenceStream">
-            <span class="sequence-empty">No operations placed — drag blocks into timelines above</span>
+          <div class="flex flex-wrap items-center gap-1.5 min-h-[38px] p-2 rounded-lg bg-slate-900/50 border border-dashed border-slate-800" id="sequenceStream">
+            <span class="text-xs text-slate-500 font-mono">No operations placed — drag blocks into timelines above</span>
           </div>
         </div>
       </section>
     </main>
 
-    <!-- Bottom Section: Conflict Analysis, Graph & Execution Logs -->
-    <section class="results-grid" id="resultsSection">
-      <!-- Serialization Conflict & Hazard Card -->
-      <div class="result-card" id="hazardsCard">
-        <div class="card-header">
-          <div class="card-title-group">
-            <div class="status-indicator-dot" id="statusDot"></div>
-            <h3>Conflict & Hazard Analysis</h3>
+    <!-- Results & Dashboard Grid -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Card 1: Static Hazard Analysis -->
+      <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-lg flex flex-col gap-4 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-500" id="statusDot"></span>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Hazard Analysis</h3>
           </div>
-          <span class="badge-status" id="serializableBadge">Idle</span>
+          <span class="badge-status text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700" id="serializableBadge">Ready</span>
         </div>
-        <div class="card-body" id="hazardsContent">
-          <div class="empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <p>Arrange operation blocks above and click <strong>Simulate Schedule</strong> to analyze serializability and detect anomalies.</p>
-          </div>
+        <div class="flex-1 overflow-y-auto max-h-[320px] text-xs text-slate-300 flex flex-col gap-2.5" id="hazardsContent">
+          <p class="text-slate-500 italic">Run simulation to evaluate conflict serializability and detect anomalies.</p>
         </div>
       </div>
 
-      <!-- Precedence Graph (Serialization Graph) Visualizer -->
-      <div class="result-card" id="graphCard">
-        <div class="card-header">
-          <h3>Precedence Graph $P(S)$</h3>
-          <span class="graph-legend">Directed Conflict Edges</span>
+      <!-- Card 2: Serialization Precedence Graph -->
+      <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-lg flex flex-col gap-4 shadow-xl">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">Precedence Graph (Serialization Graph)</h3>
         </div>
-        <div class="card-body graph-container" id="graphCanvas">
-          <svg id="precedenceSvg" width="100%" height="220" viewBox="0 0 450 220"></svg>
+        <div class="flex-1 flex items-center justify-center min-h-[260px] bg-slate-950/60 rounded-xl border border-slate-800/80 p-2">
+          <svg id="precedenceSvg" viewBox="0 0 450 220" class="w-full h-auto max-h-[240px]">
+            <!-- Graph elements dynamically injected -->
+          </svg>
         </div>
       </div>
 
-      <!-- Live MySQL Execution Trace -->
-      <div class="result-card" id="executionTraceCard">
-        <div class="card-header">
-          <h3>MySQL InnoDB Execution Trace</h3>
-          <span class="trace-meta" id="traceMeta">Live DB Step Logs</span>
+      <!-- Card 3: MySQL InnoDB Execution Trace -->
+      <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 backdrop-blur-lg flex flex-col gap-4 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">MySQL InnoDB Trace</h3>
+          <span class="text-[10px] font-mono text-slate-400">Live Execution</span>
         </div>
-        <div class="card-body trace-logs" id="traceLogContainer">
-          <div class="empty-state">
-            <p>Execution logs and lock events will appear here during simulation.</p>
-          </div>
+        <div class="flex-1 overflow-y-auto max-h-[320px] text-xs font-mono text-slate-300 flex flex-col gap-2 p-3 bg-slate-950/70 rounded-xl border border-slate-800/80" id="traceLogContainer">
+          <div class="text-slate-500 italic">No execution trace recorded. Click Simulate to execute.</div>
         </div>
       </div>
     </section>
-
-    <!-- Status Toast Notifications -->
-    <div class="toast-container" id="toastContainer"></div>
   </div>
 
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 text-xs sm:text-sm font-medium shadow-2xl" id="toastMessage">
+      Notification
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script src="js/dragdrop.js"></script>
   <script src="js/app.js"></script>
 </body>
