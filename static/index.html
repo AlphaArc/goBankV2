@@ -138,13 +138,13 @@
             </div>
 
             <!-- Write Block -->
-            <div class="palette-block flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 hover:border-purple-500/60 cursor-grab active:cursor-grabbing transition group select-none" draggable="true" data-op="WRITE" id="sourceBlockWrite">
+            <div class="palette-block flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:border-amber-500/60 cursor-grab active:cursor-grabbing transition group select-none" draggable="true" data-op="WRITE" id="sourceBlockWrite">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 font-mono font-bold flex items-center justify-center text-sm shadow-sm">W</div>
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center text-sm shadow-sm">W</div>
                 <div>
                   <div class="text-xs font-semibold text-slate-100 flex items-center gap-1.5">
                     <span>Write / Update</span>
-                    <span class="text-[10px] font-mono text-purple-400 font-bold" id="paletteWriteAmountBadge">(+$200.00)</span>
+                    <span class="text-[10px] font-mono text-amber-400 font-bold" id="paletteWriteAmountBadge">(+$200.00)</span>
                   </div>
                   <div class="text-[10px] font-mono text-slate-400" id="paletteWriteDesc">UPDATE balance in MySQL</div>
                 </div>
@@ -209,7 +209,10 @@
         <section class="p-5 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-lg shadow-xl flex flex-col gap-3.5">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 class="text-sm font-bold text-white uppercase tracking-wider">MySQL InnoDB Trace</h3>
-            <span class="text-[10px] font-mono text-slate-400">Engine Logs</span>
+            <div class="flex items-center gap-2">
+              <button id="btnSkipTrace" type="button" class="hidden text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 border border-sky-500/40 transition" title="Skip staggered playback">Skip</button>
+              <span class="text-[10px] font-mono text-slate-400">Engine Logs</span>
+            </div>
           </div>
           <div class="overflow-y-auto max-h-[280px] text-xs font-mono text-slate-300 flex flex-col gap-2 p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 custom-scrollbar" id="traceLogContainer">
             <div class="text-slate-500 italic">No execution trace recorded. Click Simulate to execute.</div>
@@ -241,31 +244,36 @@
             </div>
           </div>
 
-          <!-- Presets / Quick Scenarios -->
+          <!-- Isolation Level Selector (Milestone 4 Stretch Goal) -->
+          <div class="flex items-center gap-2">
+            <label for="isolationSelect" class="text-xs text-slate-300 font-medium">Isolation:</label>
+            <select id="isolationSelect" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-2.5 py-1.5 font-mono focus:ring-1 focus:ring-sky-500 focus:outline-none" title="MySQL Transaction Isolation Level">
+              <option value="READ UNCOMMITTED" selected>READ UNCOMMITTED</option>
+              <option value="READ COMMITTED">READ COMMITTED</option>
+              <option value="REPEATABLE READ">REPEATABLE READ</option>
+              <option value="SERIALIZABLE">SERIALIZABLE</option>
+            </select>
+          </div>
+
+          <!-- Presets / Quick Scenarios (12 Canonical Scenarios) -->
           <div class="flex items-center gap-2 flex-1 min-w-[260px] max-w-md">
             <select id="presetScenarioSelect" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 font-sans focus:ring-1 focus:ring-sky-500 focus:outline-none">
               <option value="">-- Load Scenario Preset --</option>
-              <optgroup label="1 Transaction (Single Lifecycle)">
-                <option value="tx1_atomic_transfer">1 Tx: Atomic Account Transfer (A → B)</option>
-                <option value="tx1_aborted_rollback">1 Tx: Aborted Overdraft Rollback</option>
+              <optgroup label="2 Transactions: Classic Anomalies">
+                <option value="lost_update" selected>1. Lost Update (P4 Conflict)</option>
+                <option value="dirty_read">2. Dirty Read (G1 Hazard)</option>
+                <option value="non_repeatable_read">3. Non-Repeatable Read (Fuzzy Read)</option>
+                <option value="write_skew">4. Write Skew Anomaly</option>
+                <option value="cascading_rollback">5. Cascading Rollback</option>
+                <option value="deadlock_2way">6. 2-Way Deadlock Cycle</option>
               </optgroup>
-              <optgroup label="2 Transactions (Classic Anomalies)">
-                <option value="lost_update" selected>2 Tx: Lost Update (P4 Conflict)</option>
-                <option value="dirty_read">2 Tx: Dirty Read (G1 Hazard)</option>
-                <option value="non_repeatable_read">2 Tx: Non-Repeatable Read (Fuzzy Read)</option>
-                <option value="write_skew">2 Tx: Write Skew (Snapshot Anomaly)</option>
-                <option value="deadlock_cycle">2 Tx: Serialization Cycle (2-Way Deadlock)</option>
-                <option value="serial_safe">2 Tx: Safe Serial Schedule</option>
-              </optgroup>
-              <optgroup label="3 Transactions (Multi-Tx Hazards & 3-Way Deadlock)">
-                <option value="tx3_circular_deadlock">3 Tx: 3-Way Circular Deadlock (T1→T2→T3→T1)</option>
-                <option value="tx3_dirty_cascade">3 Tx: Cascading Dirty Read & Inconsistent Analysis</option>
-                <option value="tx3_safe_pipeline">3 Tx: Serialized Pipeline (Safe Transfer & Audit)</option>
-              </optgroup>
-              <optgroup label="4 Transactions (High Concurrency & Distributed Rings)">
-                <option value="tx4_ring_deadlock">4 Tx: 4-Way Distributed Deadlock Ring</option>
-                <option value="tx4_multi_hazard">4 Tx: Multi-Hazard Storm (Lost Update + Dirty Read)</option>
-                <option value="tx4_safe_settlement">4 Tx: Concurrent Batch Settlement (Safe)</option>
+              <optgroup label="3 & 4 Transactions: Complex Schedules">
+                <option value="deadlock_3way">7. 3-Way Deadlock (T1→T2→T3→T1)</option>
+                <option value="deadlock_4way">8. 4-Way Distributed Deadlock Ring</option>
+                <option value="safe_serial">9. Safe Serial Pipeline</option>
+                <option value="disjoint_accounts">10. Disjoint Accounts (Independent Tx)</option>
+                <option value="concurrent_reads">11. Concurrent Reads (Shared Locks)</option>
+                <option value="transfer_chain">12. Transfer Chain (Sequential Transfers)</option>
               </optgroup>
             </select>
             <button id="btnLoadPreset" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition" type="button">Load</button>

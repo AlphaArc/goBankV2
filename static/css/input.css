@@ -26,3 +26,95 @@
 .schedule-grid-2 { grid-template-columns: 56px repeat(2, minmax(0, 1fr)) !important; }
 .schedule-grid-3 { grid-template-columns: 56px repeat(3, minmax(0, 1fr)) !important; }
 .schedule-grid-4 { grid-template-columns: 56px repeat(4, minmax(0, 1fr)) !important; }
+
+/* Balance Flash Animations */
+@keyframes balanceFlashGreen {
+  0% {
+    background-color: rgba(16, 185, 129, 0.35);
+    border-color: rgba(16, 185, 129, 0.8);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  }
+  100% {
+    background-color: rgba(2, 6, 23, 0.7);
+    border-color: rgb(30, 41, 59);
+    box-shadow: none;
+  }
+}
+
+@keyframes balanceFlashRed {
+  0% {
+    background-color: rgba(244, 63, 94, 0.35);
+    border-color: rgba(244, 63, 94, 0.8);
+    box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+  }
+  100% {
+    background-color: rgba(2, 6, 23, 0.7);
+    border-color: rgb(30, 41, 59);
+    box-shadow: none;
+  }
+}
+
+.flash-increase {
+  animation: balanceFlashGreen 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.flash-decrease {
+  animation: balanceFlashRed 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Pulsing amber fix button */
+@keyframes pulseAmberGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), 0 0 30px rgba(245, 158, 11, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 45px rgba(245, 158, 11, 0.35);
+    transform: scale(1.02);
+  }
+}
+
+.pulse-fix-btn {
+  animation: pulseAmberGlow 1.8s infinite ease-in-out;
+}
+
+/* SVG Precedence Graph Cycle Dashed Animation */
+@keyframes cycleDash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.cycle-edge-anim {
+  stroke-dasharray: 6 3;
+  animation: cycleDash 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cycle-edge-anim,
+  .pulse-fix-btn,
+  .flash-increase,
+  .flash-decrease {
+    animation: none !important;
+  }
+}
+
+/* Touch Selection Highlight for Palette Blocks */
+.palette-block.touch-selected {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+  background-color: rgba(56, 189, 248, 0.25) !important;
+}
+
+/* Valid & Invalid drop slot highlights */
+.slot-drop-valid {
+  border-color: #38bdf8 !important;
+  background-color: rgba(56, 189, 248, 0.15) !important;
+  transform: scale(1.01);
+}
+
+.slot-drop-invalid {
+  border-color: #f43f5e !important;
+  background-color: rgba(244, 63, 94, 0.15) !important;
+  cursor: not-allowed !important;
+}

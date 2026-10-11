@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.4.0] - 2026-10-12
+
+### Added & Refactored
+- **Implementation of Revision 2 UI Plan**:
+  - **Color Tokens in Tailwind CLI Configuration**: Configured semantic color tokens (`read=blue`, `write=amber`, `commit=green`, `rollback=red`) in `tailwind.config.js` and regenerated `static/css/output.css`.
+  - **Decoupled DnD Architecture (`dragdrop.js` & `app.js`)**: Isolated drag/drop tracking and touch interactions into `DragDropModule`, keeping application state management strictly centralized in `app.js` with pure render functions (`renderMatrix`, `renderSequenceStream`, `renderPalette`, `renderBalances`, `renderAnalysisResults`, `renderPrecedenceGraph`, `renderTraceLogs`).
+  - **Strict Matrix Placement Rules (`canPlace`)**: Enforced textbook global temporal order rules: exactly one operation per step row across all transaction columns, strict prohibition of operations following terminal steps (`COMMIT`/`ROLLBACK`), and invalid slot boundary feedback.
+  - **Dynamic Concurrent Timelines Matrix on 2PL Fix**: Configured `runFixMode()` to immediately re-render `STATE.schedule`, expand `STATE.stepRows` as needed, and rebuild the vertical matrix with `renderMatrix()` when Strict 2PL serialized operations are received from `/execute-safe`.
+  - **Curved Directed SVG Precedence Graph**: Added circular transaction node layout with curved directed quadratic Bézier arcs, conflict-type color coding (RW: blue, WR: amber, WW: pink), true tangent directional arrowhead markers (`defs/marker`), and red animated dashed lines for circular wait-for deadlock cycles (`@media (prefers-reduced-motion)` supported). Arrowhead endpoints are offset along the arrival tangent outside circle boundaries to guarantee high visibility.
+  - **Staggered Trace Console Playback**: Implemented real-time step-by-step query playback (~40ms per step) with an interactive "Skip" button for immediate log expansion and auto-scroll tracking.
+  - **Live Account Balance Flashes**: Added CSS keyframe animations that flash green (`flash-increase`) on balance gains and red (`flash-decrease`) on balance deductions.
+  - **12 Canonical Scenario Presets**: Fully unified the preset definitions in `app.js` with comprehensive unit test coverage in `analyzer_test.go`:
+    1. Lost Update (P4 Conflict)
+    2. Dirty Read (G1 Hazard)
+    3. Non-Repeatable Read (Fuzzy Read)
+    4. Write Skew Anomaly
+    5. Cascading Rollback
+    6. 2-Way Circular Deadlock
+    7. 3-Way Deadlock (T1→T2→T3→T1)
+    8. 4-Way Distributed Deadlock Ring
+    9. Safe Serial Pipeline
+    10. Disjoint Accounts
+    11. Concurrent Reads (Shared Locks)
+    12. Transfer Chain (Sequential Transfers)
+  - **Controls Bar Enhancements**: Added an explicit MySQL Transaction Isolation Level selector (`isolationSelect`) as a stretch goal, supporting `READ UNCOMMITTED`, `READ COMMITTED`, `REPEATABLE READ`, and `SERIALIZABLE`.
+  - **Touch & Accessibility Support**: Implemented tap-to-select palette fallback for mobile devices and keyboard shortcuts (`1-4` for concurrency switching, `Enter` to simulate, `Esc` to cancel touch selection).
+  - **API Contract Unification**: Added `/api/execute-safe` route handler in `internal/server/server.go` alongside `/execute-safe` and `/api/simulate`.
+
+---
+
 ## [1.3.0] - 2026-10-12
 
 ### Added & Refactored

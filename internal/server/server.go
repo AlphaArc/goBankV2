@@ -56,6 +56,7 @@ func (s *Server) routes(staticDir string) {
 	s.router.HandleFunc("/api/simulate", s.handleSimulate)
 	s.router.HandleFunc("/simulate", s.handleSimulate) // Convenience alias for Phase 2 testing
 	s.router.HandleFunc("/execute-safe", s.handleExecuteSafe) // Phase 5 Conflict Resolution endpoint
+	s.router.HandleFunc("/api/execute-safe", s.handleExecuteSafe)
 	s.router.HandleFunc("/api/fix", s.handleExecuteSafe)
 }
 

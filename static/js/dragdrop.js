@@ -1,227 +1,296 @@
 /**
- * Drag & Drop Module for goBankV2 Timeline Operations
- * Non-editable placed blocks with live DB amounts and smooth out-of-bounds deletion.
+ * dragdrop.js - HTML5 Drag & Drop & Touch Controller for goBankV2
+ *
+ * Responsibilities (Section 4.3):
+ * - Starts drags from palette blocks (READ, WRITE, COMMIT, ROLLBACK).
+ * - Highlights valid slots (and marks invalid slots).
+ * - Enforces slot boundaries and canPlace validation.
+ * - Captures target account and delta from palette at drop time.
+ * - Reordering between slots.
+ * - Animated delete when a block is dropped outside the matrix.
+ * - Touch fallback: tap a palette block, then tap a slot (Section 4.4).
+ * - Disables DnD during BUSY mode (Section 4.6).
+ * - NEVER touches schedule state directly; calls callbacks into app.js.
  */
 
 window.DragDropModule = (function () {
-  let draggedData = null;
-  let draggedBlockElement = null;
-  let droppedInValidSlot = false;
-  let onScheduleChangeCallback = null;
+  let callbacks = {
+    onPlace: null,
+    onMove: null,
+    onRemove: null,
+    canPlace: null,
+    showToast: null,
+    isBusy: () => false,
+  };
 
-  function init(onScheduleChange) {
-    onScheduleChangeCallback = onScheduleChange;
-    setupPaletteDraggables();
+  let draggedPaletteOp = null;
+  let draggedPlacedBlock = null;
+  let droppedInValidSlot = false;
+  let touchSelectedOp = null;
+
+  function init(cb) {
+    callbacks = { ...callbacks, ...cb };
+    setupPalette();
   }
 
-  function setupPaletteDraggables() {
+  function setupPalette() {
     const paletteBlocks = document.querySelectorAll('.palette-block');
     paletteBlocks.forEach(block => {
+      // HTML5 Drag Events
       block.addEventListener('dragstart', handlePaletteDragStart);
-      block.addEventListener('dragend', handleDragEnd);
+      block.addEventListener('dragend', handlePaletteDragEnd);
+
+      // Touch / Tap Fallback
+      block.addEventListener('click', handlePaletteClick);
     });
   }
 
   function handlePaletteDragStart(e) {
-    const op = this.getAttribute('data-op');
-    const account = document.getElementById('paletteAccount').value || 'A';
-    const delta = parseFloat(document.getElementById('paletteDelta').value) || 200;
-
-    draggedData = {
-      isNew: true,
-      op: op,
-      account: (op === 'COMMIT' || op === 'ROLLBACK') ? 'ALL' : account,
-      amount: op === 'WRITE' ? delta : 0,
-    };
-    draggedBlockElement = null;
-    droppedInValidSlot = false;
-
-    e.dataTransfer.setData('text/plain', JSON.stringify(draggedData));
-    e.dataTransfer.effectAllowed = 'copy';
-    this.classList.add('dragging');
-  }
-
-  function handleDragEnd() {
-    this.classList.remove('opacity-50', 'ring-2', 'ring-sky-400', 'dragging');
-    document.querySelectorAll('.timeline-slot').forEach(slot => {
-      slot.classList.remove('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
-    });
-
-    // Out-of-bounds deletion: If a placed block was dropped outside valid slots
-    if (draggedData && !draggedData.isNew && !droppedInValidSlot && draggedBlockElement) {
-      const blockToDelete = draggedBlockElement;
-      // Tailwind fade-out transition classes
-      blockToDelete.classList.add('transition-opacity', 'duration-300', 'opacity-0', 'scale-75', '-translate-y-2');
-      setTimeout(() => {
-        if (blockToDelete.parentElement) {
-          blockToDelete.parentElement.innerHTML = '';
-        }
-        if (onScheduleChangeCallback) {
-          onScheduleChangeCallback();
-        }
-      }, 300);
+    if (callbacks.isBusy && callbacks.isBusy()) {
+      e.preventDefault();
+      return;
     }
 
-    draggedData = null;
-    draggedBlockElement = null;
+    const op = this.getAttribute('data-op');
+    draggedPaletteOp = op;
+    draggedPlacedBlock = null;
+    droppedInValidSlot = false;
+
+    // Clear any active touch selection
+    clearTouchSelection();
+
+    const transferData = {
+      isPalette: true,
+      op: op,
+    };
+    e.dataTransfer.setData('text/plain', JSON.stringify(transferData));
+    e.dataTransfer.effectAllowed = 'copy';
+    this.classList.add('opacity-50', 'ring-2', 'ring-sky-400');
+  }
+
+  function handlePaletteDragEnd() {
+    this.classList.remove('opacity-50', 'ring-2', 'ring-sky-400');
+    clearSlotHighlights();
+    draggedPaletteOp = null;
+    draggedPlacedBlock = null;
     droppedInValidSlot = false;
   }
 
-  function bindSlotEvents(slotElement) {
-    slotElement.addEventListener('dragover', handleSlotDragOver);
-    slotElement.addEventListener('dragleave', handleSlotDragLeave);
-    slotElement.addEventListener('drop', handleSlotDrop);
+  function handlePaletteClick() {
+    if (callbacks.isBusy && callbacks.isBusy()) return;
+
+    const op = this.getAttribute('data-op');
+    if (touchSelectedOp === op) {
+      clearTouchSelection();
+      if (callbacks.showToast) callbacks.showToast('Block deselected.', 'info');
+    } else {
+      clearTouchSelection();
+      touchSelectedOp = op;
+      this.classList.add('touch-selected');
+      if (callbacks.showToast) {
+        callbacks.showToast(`Selected ${op}. Tap an empty step slot to place.`, 'info');
+      }
+    }
+  }
+
+  function clearTouchSelection() {
+    touchSelectedOp = null;
+    document.querySelectorAll('.palette-block').forEach(b => {
+      b.classList.remove('touch-selected');
+    });
+  }
+
+  function clearSlotHighlights() {
+    document.querySelectorAll('.timeline-slot').forEach(slot => {
+      slot.classList.remove('slot-drop-valid', 'slot-drop-invalid', 'border-sky-400', 'bg-slate-800/90');
+    });
+  }
+
+  function bindSlot(slotEl) {
+    slotEl.addEventListener('dragover', handleSlotDragOver);
+    slotEl.addEventListener('dragenter', handleSlotDragEnter);
+    slotEl.addEventListener('dragleave', handleSlotDragLeave);
+    slotEl.addEventListener('drop', handleSlotDrop);
+    slotEl.addEventListener('click', handleSlotClick);
   }
 
   function handleSlotDragOver(e) {
+    if (callbacks.isBusy && callbacks.isBusy()) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    this.classList.add('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
+
+    const targetTx = this.getAttribute('data-tx');
+    const targetStep = parseInt(this.getAttribute('data-step'), 10);
+    const movingId = draggedPlacedBlock ? draggedPlacedBlock.id : null;
+    const op = draggedPlacedBlock ? draggedPlacedBlock.op : draggedPaletteOp;
+
+    const check = callbacks.canPlace ? callbacks.canPlace(targetTx, targetStep, movingId, op) : { allowed: true };
+    if (check.allowed) {
+      e.dataTransfer.dropEffect = draggedPlacedBlock ? 'move' : 'copy';
+      this.classList.add('slot-drop-valid');
+      this.classList.remove('slot-drop-invalid');
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+      this.classList.add('slot-drop-invalid');
+      this.classList.remove('slot-drop-valid');
+    }
+  }
+
+  function handleSlotDragEnter(e) {
+    e.preventDefault();
   }
 
   function handleSlotDragLeave() {
-    this.classList.remove('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
+    this.classList.remove('slot-drop-valid', 'slot-drop-invalid');
   }
 
   function handleSlotDrop(e) {
     e.preventDefault();
-    this.classList.remove('border-sky-400', 'bg-slate-800/90', 'scale-[1.02]');
-    droppedInValidSlot = true;
+    this.classList.remove('slot-drop-valid', 'slot-drop-invalid');
 
-    let payload = draggedData;
-    if (!payload) {
-      try {
-        const raw = e.dataTransfer.getData('text/plain');
-        if (raw) payload = JSON.parse(raw);
-      } catch (err) {
-        console.error('Failed to parse drag payload:', err);
-      }
-    }
-
-    if (!payload) return;
+    if (callbacks.isBusy && callbacks.isBusy()) return;
 
     const targetTx = this.getAttribute('data-tx');
     const targetStep = parseInt(this.getAttribute('data-step'), 10);
 
-    // If moving from another slot
-    if (!payload.isNew && payload.sourceTx && payload.sourceStep) {
-      const sourceSlot = document.querySelector(`.timeline-slot[data-tx="${payload.sourceTx}"][data-step="${payload.sourceStep}"]`);
-      if (sourceSlot && sourceSlot !== this) {
-        sourceSlot.innerHTML = '';
-      }
+    let payload = null;
+    try {
+      const raw = e.dataTransfer.getData('text/plain');
+      if (raw) payload = JSON.parse(raw);
+    } catch (err) {
+      // ignore JSON parse error
     }
 
-    // Place the block into this slot (non-editable with proper DB amounts)
-    placeBlockInSlot(this, {
-      txId: targetTx,
-      stepIndex: targetStep,
-      op: payload.op,
-      account: payload.account,
-      amount: payload.amount,
-    });
+    const movingId = draggedPlacedBlock ? draggedPlacedBlock.id : null;
+    const op = draggedPlacedBlock ? draggedPlacedBlock.op : (payload ? payload.op : draggedPaletteOp);
 
-    if (onScheduleChangeCallback) {
-      onScheduleChangeCallback();
+    // Validate placement
+    const check = callbacks.canPlace ? callbacks.canPlace(targetTx, targetStep, movingId, op) : { allowed: true };
+    if (!check.allowed) {
+      if (callbacks.showToast) {
+        callbacks.showToast(check.reason || 'Cannot place operation here.', 'warning');
+      }
+      return;
+    }
+
+    droppedInValidSlot = true;
+
+    if (draggedPlacedBlock) {
+      // Reordering an existing block
+      const sourceId = draggedPlacedBlock.id;
+      if (callbacks.onMove) {
+        callbacks.onMove(sourceId, targetTx, targetStep);
+      }
+    } else if (op) {
+      // Dropping a new block from the palette
+      const accountEl = document.getElementById('paletteAccount');
+      const deltaEl = document.getElementById('paletteDelta');
+      const account = (op === 'COMMIT' || op === 'ROLLBACK') ? 'ALL' : (accountEl ? accountEl.value : 'A');
+      const delta = (op === 'WRITE') ? (parseFloat(deltaEl ? deltaEl.value : 200) || 200) : 0;
+
+      if (callbacks.onPlace) {
+        callbacks.onPlace(targetTx, targetStep, op, account, delta);
+      }
     }
   }
 
-  function placeBlockInSlot(slotElement, blockData) {
-    slotElement.innerHTML = ''; // Replace any existing block
+  function handleSlotClick() {
+    if (callbacks.isBusy && callbacks.isBusy()) return;
+    if (!touchSelectedOp) return;
 
-    const blockDiv = document.createElement('div');
-    blockDiv.setAttribute('draggable', 'true');
-    blockDiv.dataset.tx = blockData.txId;
-    blockDiv.dataset.step = blockData.stepIndex;
-    blockDiv.dataset.op = blockData.op;
-    blockDiv.dataset.account = blockData.account;
-    blockDiv.dataset.amount = blockData.amount || 0;
+    const targetTx = this.getAttribute('data-tx');
+    const targetStep = parseInt(this.getAttribute('data-step'), 10);
 
-    let opStyles = 'bg-sky-500/15 border-sky-500/40 text-sky-100';
-    let opBadgeColor = 'text-sky-400 bg-sky-500/20';
-    let detailsHtml = '';
-
-    if (blockData.op === 'READ') {
-      opStyles = 'bg-sky-500/15 border-sky-500/40 text-sky-100';
-      opBadgeColor = 'text-sky-400 bg-sky-500/20';
-      detailsHtml = `
-        <div class="flex items-center gap-1.5 font-mono text-xs font-bold text-sky-300">
-          <span>READ(${blockData.account})</span>
-        </div>
-        <span class="text-[10px] font-mono text-slate-400">SELECT balance</span>
-      `;
-    } else if (blockData.op === 'WRITE') {
-      opStyles = 'bg-purple-500/15 border-purple-500/40 text-purple-100';
-      opBadgeColor = 'text-purple-400 bg-purple-500/20';
-      const sign = blockData.amount >= 0 ? '+' : '';
-      detailsHtml = `
-        <div class="flex items-center justify-between gap-1 font-mono text-xs font-bold text-purple-300">
-          <span>WRITE(${blockData.account})</span>
-          <span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 text-[10px]">${sign}$${Math.abs(blockData.amount)}</span>
-        </div>
-        <span class="text-[10px] font-mono text-slate-400">UPDATE balance</span>
-      `;
-    } else if (blockData.op === 'COMMIT') {
-      opStyles = 'bg-emerald-500/15 border-emerald-500/40 text-emerald-100';
-      opBadgeColor = 'text-emerald-400 bg-emerald-500/20';
-      detailsHtml = `
-        <div class="font-mono text-xs font-bold text-emerald-300">COMMIT</div>
-        <span class="text-[10px] font-mono text-emerald-400/80">Release Locks</span>
-      `;
-    } else if (blockData.op === 'ROLLBACK') {
-      opStyles = 'bg-rose-500/15 border-rose-500/40 text-rose-100';
-      opBadgeColor = 'text-rose-400 bg-rose-500/20';
-      detailsHtml = `
-        <div class="font-mono text-xs font-bold text-rose-300">ROLLBACK</div>
-        <span class="text-[10px] font-mono text-rose-400/80">Abort & Undo</span>
-      `;
+    const check = callbacks.canPlace ? callbacks.canPlace(targetTx, targetStep, null, touchSelectedOp) : { allowed: true };
+    if (!check.allowed) {
+      if (callbacks.showToast) {
+        callbacks.showToast(check.reason || 'Cannot place operation here.', 'warning');
+      }
+      return;
     }
 
-    blockDiv.className = `placed-block relative w-full h-full p-2 rounded-xl flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing select-none border transition-all duration-200 shadow-sm ${opStyles}`;
+    const accountEl = document.getElementById('paletteAccount');
+    const deltaEl = document.getElementById('paletteDelta');
+    const op = touchSelectedOp;
+    const account = (op === 'COMMIT' || op === 'ROLLBACK') ? 'ALL' : (accountEl ? accountEl.value : 'A');
+    const delta = (op === 'WRITE') ? (parseFloat(deltaEl ? deltaEl.value : 200) || 200) : 0;
 
-    blockDiv.innerHTML = `
-      <div class="flex items-center gap-2 min-w-0">
-        <div class="w-6 h-6 rounded-md ${opBadgeColor} font-mono font-bold flex items-center justify-center text-[10px] flex-shrink-0">
-          ${blockData.op === 'READ' ? 'R' : blockData.op === 'WRITE' ? 'W' : blockData.op === 'COMMIT' ? 'C' : 'AB'}
-        </div>
-        <div class="flex flex-col min-w-0 leading-tight">
-          ${detailsHtml}
-        </div>
-      </div>
-      <button type="button" class="placed-remove text-slate-400 hover:text-rose-400 font-bold text-base leading-none p-1 rounded hover:bg-slate-800/60 transition flex-shrink-0" title="Remove block">&times;</button>
-    `;
+    clearTouchSelection();
 
-    // Remove button listener
-    blockDiv.querySelector('.placed-remove').addEventListener('click', (e) => {
-      e.stopPropagation();
-      slotElement.innerHTML = '';
-      if (onScheduleChangeCallback) onScheduleChangeCallback();
-    });
+    if (callbacks.onPlace) {
+      callbacks.onPlace(targetTx, targetStep, op, account, delta);
+    }
+  }
 
-    // Make placed block draggable to move it
-    blockDiv.addEventListener('dragstart', (e) => {
-      draggedData = {
-        isNew: false,
-        sourceTx: blockData.txId,
-        sourceStep: blockData.stepIndex,
-        op: blockData.op,
-        account: blockData.account,
-        amount: blockData.amount,
-      };
-      draggedBlockElement = blockDiv;
+  function bindPlacedBlock(blockEl, blockData) {
+    blockEl.setAttribute('draggable', 'true');
+
+    blockEl.addEventListener('dragstart', (e) => {
+      if (callbacks.isBusy && callbacks.isBusy()) {
+        e.preventDefault();
+        return;
+      }
+
+      draggedPlacedBlock = { ...blockData };
+      draggedPaletteOp = null;
       droppedInValidSlot = false;
-      e.dataTransfer.setData('text/plain', JSON.stringify(draggedData));
+      clearTouchSelection();
+
+      e.dataTransfer.setData('text/plain', JSON.stringify({
+        isPalette: false,
+        id: blockData.id,
+        tx: blockData.tx,
+        step: blockData.step,
+        op: blockData.op,
+      }));
       e.dataTransfer.effectAllowed = 'move';
-      blockDiv.classList.add('opacity-50', 'ring-2', 'ring-sky-400');
+      blockEl.classList.add('opacity-50', 'ring-2', 'ring-sky-400');
     });
 
-    blockDiv.addEventListener('dragend', handleDragEnd);
+    blockEl.addEventListener('dragend', () => {
+      blockEl.classList.remove('opacity-50', 'ring-2', 'ring-sky-400');
+      clearSlotHighlights();
 
-    slotElement.appendChild(blockDiv);
+      // Out-of-bounds deletion check: dropped outside matrix
+      if (draggedPlacedBlock && !droppedInValidSlot) {
+        const idToDelete = draggedPlacedBlock.id;
+        blockEl.classList.add('transition-opacity', 'duration-300', 'opacity-0', 'scale-75', '-translate-y-2');
+        setTimeout(() => {
+          if (callbacks.onRemove) {
+            callbacks.onRemove(idToDelete);
+          }
+        }, 300);
+      }
+
+      draggedPlacedBlock = null;
+      draggedPaletteOp = null;
+      droppedInValidSlot = false;
+    });
+  }
+
+  function setDisabled(disabled) {
+    const paletteBlocks = document.querySelectorAll('.palette-block');
+    paletteBlocks.forEach(b => {
+      b.setAttribute('draggable', !disabled);
+      if (disabled) b.classList.add('cursor-not-allowed', 'opacity-50');
+      else b.classList.remove('cursor-not-allowed', 'opacity-50');
+    });
+
+    const placedBlocks = document.querySelectorAll('.placed-block');
+    placedBlocks.forEach(b => {
+      b.setAttribute('draggable', !disabled);
+      if (disabled) b.classList.add('cursor-not-allowed');
+      else b.classList.remove('cursor-not-allowed');
+    });
   }
 
   return {
     init,
-    bindSlotEvents,
-    placeBlockInSlot,
+    bindSlot,
+    bindPlacedBlock,
+    clearTouchSelection,
+    setDisabled,
   };
 })();
