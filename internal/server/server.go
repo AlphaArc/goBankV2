@@ -52,6 +52,7 @@ func (s *Server) routes(staticDir string) {
 	s.router.HandleFunc("/api/reset", s.handleReset)
 	s.router.HandleFunc("/api/analyze", s.handleAnalyze)
 	s.router.HandleFunc("/api/simulate", s.handleSimulate)
+	s.router.HandleFunc("/simulate", s.handleSimulate) // Convenience alias for Phase 2 testing
 	s.router.HandleFunc("/api/fix", s.handleFix)
 }
 
@@ -118,9 +119,24 @@ func (s *Server) handleSimulate(w http.ResponseWriter, r *http.Request) {
 
 	var req models.SimulationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body: " + err.Error()})
 		return
 	}
+
+	// Validation
+	if len(req.Schedule) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Validation failed: schedule cannot be empty"})
+		return
+	}
+
+	// Print parsed schedule to server console
+	log.Printf("------------------------------------------------------------------")
+	log.Printf("[SIMULATE] Received Schedule with %d steps across %d transactions:", len(req.Schedule), req.TxCount)
+	for _, step := range req.Schedule {
+		log.Printf("  -> Step %d | Tx: %-2s | Op: %-6s | Account: %-2s | Delta: $%.2f",
+			step.StepIndex, step.TxID, step.Op, step.Account, step.Amount)
+	}
+	log.Printf("------------------------------------------------------------------")
 
 	result, err := s.db.ExecuteSimulation(req)
 	if err != nil {
