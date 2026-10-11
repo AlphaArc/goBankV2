@@ -126,3 +126,35 @@ goBankV2/
 
 4. **Access the visual simulator:**
    Open your browser and navigate to `http://localhost:8080`.
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/accounts` | Returns current balances for Accounts A, B, and C. |
+| `POST` | `/api/reset` | Resets all bank account balances to $1,000.00 baseline. |
+| `POST` | `/api/analyze` | Evaluates schedule serializability and returns precedence graph without DB changes. |
+| `POST` | `/simulate` | Executes schedule concurrently on MySQL InnoDB, logging raw lock behaviors and deadlocks. |
+| `POST` | `/execute-safe` | Resolves serialization conflicts by applying Strict Two-Phase Locking (S2PL) with `SELECT ... FOR UPDATE`. |
+
+---
+
+## Concurrency Controls & Deadlock Resolution
+
+- **Strict Two-Phase Locking (Strict 2PL)**:
+  - All read operations on conflicting accounts acquire exclusive row locks (`SELECT ... FOR UPDATE`).
+  - All updates hold row-level exclusive locks until the transaction explicitly executes `COMMIT`.
+  - Cascading aborts and dirty reads are prevented.
+- **Deadlock Handling (MySQL InnoDB Error 1213)**:
+  - When circular lock dependencies occur (e.g. $T_1$ holds A and requests B, while $T_2$ holds B and requests A), MySQL's InnoDB deadlock engine detects the cycle.
+  - The Go backend catches Error 1213, automatically rolls back the chosen victim transaction, and issues a clean state restoration.
+  - The UI highlights the victim transaction with a `DEADLOCK ROLLED BACK` badge and notifies the user.
+- **Educational Presets**:
+  - **Lost Update (P4 Conflict)**: Interleaved read-modify-write resulting in an overwritten balance.
+  - **Dirty Read (G1 Hazard)**: Reading uncommitted state from an aborted transaction.
+  - **Non-Repeatable Read**: Re-reading modified and committed data within an open transaction.
+  - **Write Skew**: Snapshot anomaly across multiple related records.
+  - **Serialization Cycle**: Circular lock dependencies triggering real MySQL Error 1213 deadlocks.
+  - **Safe Serial**: Clean, serial execution with zero hazards.

@@ -1069,10 +1069,46 @@ body {
   border-left-color: var(--accent-rose);
   background: rgba(244, 63, 94, 0.08);
 }
+.trace-entry.status-DEADLOCK_ROLLED_BACK {
+  border-left-color: #f43f5e;
+  background: rgba(244, 63, 94, 0.15);
+  box-shadow: 0 0 15px rgba(244, 63, 94, 0.2);
+}
 
 .trace-top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.trace-right-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-deadlock {
+  background: rgba(244, 63, 94, 0.25);
+  color: #fca5a5;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+}
+.badge-blocked {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fde047;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.badge-success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #a7f3d0;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .trace-step-tag {

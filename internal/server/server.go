@@ -192,7 +192,7 @@ func (s *Server) handleExecuteSafe(w http.ResponseWriter, r *http.Request) {
 }
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
 }

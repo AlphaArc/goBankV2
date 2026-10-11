@@ -30,8 +30,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     - `GET /api/accounts`: Real-time account balances.
     - `POST /api/reset`: Clean database reset to $1,000 baseline.
     - `POST /api/analyze`: Static schedule and hazard inspection.
-    - `POST /api/simulate`: Live database execution against MySQL.
-    - `POST /api/fix`: Transformation and safe execution under Strict 2PL.
+    - `POST /simulate`: Live database execution against MySQL InnoDB.
+    - `POST /execute-safe`: Concurrency conflict resolution enforcing Strict Two-Phase Locking (S2PL) with row-level locks (`SELECT ... FOR UPDATE`) and `SERIALIZABLE` isolation.
+  - **Phase 5 Concurrency Control & Deadlock Handling**:
+    - **Deadlock Detection (MySQL Error 1213)**: Interleaved concurrent execution allows InnoDB to identify circular wait-for dependencies in real time.
+    - **Automatic Victim Rollback**: Go backend catches Error 1213, rolls back the victim transaction cleanly, and surfaces the `DEADLOCK_ROLLED_BACK` event with explanatory messaging.
+    - **Dynamic Button Transformation**: "Simulate Schedule" button dynamically morphs into "Fix Problem (Apply Strict 2PL)" upon anomaly detection.
+    - **Visual Trace Logs**: Status badges for `⚠️ DEADLOCK ROLLED BACK`, `⏳ LOCK WAIT`, and `✓ SUCCESS` with microsecond-level query latencies.
+    - **Educational Presets**: Dropdown covering Lost Update (P4), Dirty Read (G1), Non-Repeatable Read, Write Skew, Serialization Cycle / Deadlock, and Safe Serial schedules.
   - `main.go`: Server entrypoint with environment variable configuration and graceful startup.
 - **Frontend UI & Visualization (`static/`)**:
   - Modern, responsive dark-mode interface with glassmorphism, glowing accents, and high-contrast typography (`Plus Jakarta Sans` and `JetBrains Mono`).

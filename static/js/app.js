@@ -205,7 +205,7 @@
   function transformToFixState() {
     STATE.mode = 'FIX';
     btnMainAction.className = 'btn-primary-action fix-state';
-    actionButtonText.textContent = 'Fix Problem (Strict 2PL)';
+    actionButtonText.textContent = 'Fix Problem (Apply Strict 2PL)';
     actionIcon.innerHTML = `
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -302,7 +302,12 @@
 
   async function runFix(schedule) {
     try {
-      const resp = await fetch('/api/fix', {
+      console.log('------------------------------------------------------------');
+      console.log('[goBankV2 Frontend] Calling POST /execute-safe with Strict 2PL:');
+      console.log(JSON.stringify({ txCount: STATE.txCount, schedule: schedule }, null, 2));
+      console.log('------------------------------------------------------------');
+
+      const resp = await fetch('/execute-safe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -313,7 +318,7 @@
       });
 
       if (!resp.ok) {
-        throw new Error(`Fix failed: ${resp.statusText}`);
+        throw new Error(`Execute Safe failed: ${resp.statusText}`);
       }
 
       const data = await resp.json();
@@ -426,10 +431,22 @@
         valText = ` | Balance: $${log.writtenValue.toFixed(2)}`;
       }
 
+      let statusTag = '';
+      if (log.status === 'DEADLOCK_ROLLED_BACK') {
+        statusTag = '<span class="status-badge badge-deadlock">⚠️ DEADLOCK ROLLED BACK</span>';
+      } else if (log.status === 'BLOCKED_WAIT') {
+        statusTag = '<span class="status-badge badge-blocked">⏳ LOCK WAIT</span>';
+      } else if (log.status === 'SUCCESS') {
+        statusTag = '<span class="status-badge badge-success">✓ SUCCESS</span>';
+      }
+
       entry.innerHTML = `
         <div class="trace-top">
           <span class="trace-step-tag">Step ${log.stepIndex}: [${log.txId}] ${log.op} (${log.account})</span>
-          <span class="trace-duration">${log.durationMs}ms</span>
+          <div class="trace-right-meta">
+            ${statusTag}
+            <span class="trace-duration">${log.durationMs}ms</span>
+          </div>
         </div>
         <div class="trace-detail">${escapeHtml(log.detail)}${valText}</div>
       `;

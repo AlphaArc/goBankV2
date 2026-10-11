@@ -152,7 +152,14 @@ func (m *DBManager) ExecuteSimulation(req models.SimulationRequest) (*models.Sim
 	}
 
 	// 5. Coordinator: Step through timeline sequentially and collect live logs
-	var execLogs []models.ExecutionStepLog
+	// Dispatch operations in timeline order. If an operation blocks waiting for an InnoDB lock,
+	// we allow subsequent operations of other transactions to be dispatched so that concurrent
+	// lock acquisitions interact in MySQL (triggering InnoDB Error 1213 deadlocks when cycles occur).
+	type pendingStep struct {
+		replyCh chan workerResponse
+		resp    *workerResponse
+	}
+	pending := make([]*pendingStep, 0, len(steps))
 
 	for _, step := range steps {
 		ch, exists := workers[step.TxID]
@@ -168,8 +175,26 @@ func (m *DBManager) ExecuteSimulation(req models.SimulationRequest) (*models.Sim
 		}
 
 		ch <- cmd
-		resp := <-replyCh
-		execLogs = append(execLogs, resp.logEntry)
+		ps := &pendingStep{replyCh: replyCh}
+		pending = append(pending, ps)
+
+		// Give query a brief window to complete normally
+		select {
+		case r := <-replyCh:
+			ps.resp = &r
+		case <-time.After(30 * time.Millisecond):
+			// Query is blocked on an InnoDB row lock; continue dispatching so other transactions can run
+		}
+	}
+
+	var execLogs []models.ExecutionStepLog
+	for _, ps := range pending {
+		if ps.resp != nil {
+			execLogs = append(execLogs, ps.resp.logEntry)
+		} else {
+			r := <-ps.replyCh
+			execLogs = append(execLogs, r.logEntry)
+		}
 	}
 
 	// 6. Close worker channels to signal clean shutdown
